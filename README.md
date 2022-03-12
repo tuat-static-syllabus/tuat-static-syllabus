@@ -1,0 +1,1 @@
+# tuat-static-syllabus
