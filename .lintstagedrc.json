@@ -1,0 +1,7 @@
+{
+"*.js": [
+    "prettier --print-width 200 --write",
+    "eslint",
+    "git add"
+]
+}
