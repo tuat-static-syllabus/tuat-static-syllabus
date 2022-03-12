@@ -39,21 +39,25 @@ async function findDropdowns() {
   return dropDowns;
 }
 
-async function click(tagId) {
+function waitNav() {
+  return page.waitForNavigation({ waitUntil: "networkidle2" });
+}
+
+async function click(tagId, wait = false) {
   // clicks button
   await page.click(`input[name=${tagId}]`);
-  // await page.waitForNavigation({waitUntil: 'networkidle2'});
+  if (wait) await waitNav();
 }
 
 async function dropdown(tagId, value, wait = false) {
   // only use when page refreshes if changed, else not needed
   await page.select(`select[name=${tagId}]`, value);
-  if (wait) await page.waitForNavigation({ waitUntil: "networkidle2" });
+  if (wait) await waitNav();
 }
 
-async function typeInput(tagId, value) {
+async function typeInput(tagId, value, wait = false) {
   await page.type(`input[name=${tagId}]`, value);
-  // await page.waitForNavigation({waitUntil: 'networkidle2'});
+  if (wait) await waitNav();
 }
 
 function init() {
@@ -77,9 +81,30 @@ try {
       console.log(`Clicking ${year.name} and ${faculty.name}`);
       await dropdown("ddl_fac", faculty.value);
       await dropdown("ddl_year", year.value, true);
-      await click("btnSearch");
+      await click("btnSearch", true);
 
-      // now subject page was shown, let's do paging
+      // now subject list page was shown, let's do scrape each subjects and paging
+      let currentPage = 1,
+        knownMax = 5;
+      while (currentPage != knownMax) {
+        // iterate through 詳細 buttons, in weird way!
+        let itemsInPage = await page.$$("input[type=submit][value=詳細]");
+        const totalInPage = itemsInPage.length;
+        for (let i = 0; i < totalInPage; i++) {
+          itemsInPage[i].click();
+          await waitNav();
+
+          // scrape the page and put it into database
+          await sleep(2000);
+
+          // we're allowed to go back by browser's Back button!
+          await page.goBack();
+          // grab handle again...
+          itemsInPage = await page.$$("input[type=submit][value=詳細]");
+        }
+
+        await page.$("tr[align=center]:not([style])");
+      }
 
       await init();
     }
