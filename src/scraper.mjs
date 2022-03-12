@@ -9,11 +9,18 @@ const browser = await puppeteer.launch({
 });
 const page = await browser.newPage();
 
+page.on("requestfailed", async (request) => {
+  console.log(`url: ${request.url()}, errText: ${request.failure().errorText}, method: ${request.method()}`);
+  if ("net::ERR_CACHE_MISS" === request.failure().errorText) {
+    await page.reload();
+  }
+});
+
 function attr(ee, name) {
-  return page.evaluate((ee, name) => ee.getAttribute(name), ee, name);
+  return page.evaluate((nk, tu) => nk.getAttribute(tu), ee, name);
 }
 function inner(ee) {
-  return page.evaluate((ee) => ee.innerText, ee);
+  return page.evaluate((at) => at.innerText, ee);
 }
 
 // open the database
@@ -40,7 +47,7 @@ async function findDropdowns() {
 }
 
 function waitNav() {
-  return page.waitForNavigation({ waitUntil: "networkidle2" });
+  return page.waitForNavigation();
 }
 
 async function click(tagId, wait = false) {
@@ -85,26 +92,61 @@ try {
 
       // now subject list page was shown, let's do scrape each subjects and paging
       let currentPage = 1,
-        knownMax = 5;
-      while (currentPage != knownMax) {
+        knownMax = 2;
+      do {
+        console.log(`Now at page ${currentPage}`);
         // iterate through 詳細 buttons, in weird way!
         let itemsInPage = await page.$$("input[type=submit][value=詳細]");
         const totalInPage = itemsInPage.length;
         for (let i = 0; i < totalInPage; i++) {
-          itemsInPage[i].click();
-          await waitNav();
+          await itemsInPage[i].click();
 
           // scrape the page and put it into database
-          await sleep(2000);
+          console.log(`Clicking row ${i}`);
+          await sleep(1000);
 
           // we're allowed to go back by browser's Back button!
           await page.goBack();
           // grab handle again...
-          itemsInPage = await page.$$("input[type=submit][value=詳細]");
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            itemsInPage = await page.$$("input[type=submit][value=詳細]");
+            if (itemsInPage.length === totalInPage) break;
+
+            await sleep(10);
+            continue;
+          }
         }
 
-        await page.$("tr[align=center]:not([style])");
-      }
+        const pager = await page.$$("tr[align=center]:not([style]) a");
+        // get maximum number of pages
+        for (const pageElem of [...pager].reverse()) {
+          const num = parseInt((await inner(pageElem)).trim());
+          // failed to parse (次へ or ...)
+          if (num !== num) continue;
+          // we're already on last page
+          if (num <= knownMax) break;
+          if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+
+          knownMax = num;
+          break;
+        }
+
+        // try to go to the next page
+        for (const pageElem of pager) {
+          const num = parseInt((await inner(pageElem)).trim());
+          // failed to parse
+          if (num !== num) continue;
+          // not worth to click (goes back to previous page)
+          if (num <= currentPage) continue;
+
+          // voila!
+          currentPage = num;
+          await pageElem.click();
+          await waitNav();
+          break;
+        }
+      } while (currentPage <= knownMax);
 
       await init();
     }
