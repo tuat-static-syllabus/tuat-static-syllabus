@@ -31,9 +31,39 @@ async function innerByQuery(q) {
 
 // open the database
 const db = await open({
-  filename: ":memory:",
+  filename: "/tmp/tuat.sqlite",
   driver: sqlite3.Database,
 });
+{
+  const old = db.get;
+  db.get = async function () {
+    try {
+      return await old.apply(db, arguments);
+    } catch (e) {
+      throw new Error(e);
+    }
+  }
+}
+{
+  const old = db.run;
+  db.run = async function () {
+    try {
+      return await old.apply(db, arguments);
+    } catch (e) {
+      throw new Error(e);
+    }
+  }
+}
+{
+  const old = db.exec;
+  db.exec = async function () {
+    try {
+      return await old.apply(db, arguments);
+    } catch (e) {
+      throw new Error(e);
+    }
+  }
+}
 
 // prepare tables
 {
@@ -58,24 +88,25 @@ const db = await open({
            course_description TEXT, expected_learning TEXT, course_schedule TEXT, prerequisites TEXT,
            texts_and_materials TEXT, _references TEXT, assessment TEXT, message_from_instructor TEXT,
            course_keywords TEXT, office_hours TEXT, remarks_1 TEXT, remarks_2 TEXT, related_url TEXT,
-           course_language TEXT, taught_language TEXT, last_update TEXT);
+           course_language TEXT, taught_language TEXT, last_update TEXT
+      );
 
-      CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name TEXT, lang_code TEXT);
-      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, min INTEGER, max INTEGER);
+      CREATE TABLE present_lang_table (id INTEGER PRIMARY KEY AUTOINCREMENT, lang_name TEXT, lang_code TEXT);
+      CREATE TABLE grades_table (id INTEGER PRIMARY KEY AUTOINCREMENT, min INTEGER, max INTEGER);
 
-      CREATE TABLE name_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE instructor_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE category_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE department_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE semester_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE course_type_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
-      CREATE TABLE office_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE name_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE instructor_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE neutral_department_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE category_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE department_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE semester_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE course_type_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE facility_affiliation_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE office_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
     `);
     // add some data that are already known in tables
-    await db.exec(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
-    await db.exec(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "English", "en");
+    await db.run(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
+    await db.run(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "English", "en");
 
     const japaneseDeps = [
       "農学部",
@@ -118,25 +149,25 @@ const db = await open({
       "WISE PROGRAM",
     ];
     for (let i = 0; i < japaneseDeps.length; i++) {
-      await db.exec(`INSERT INTO neutral_department_table(jp, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
-      await db.exec(`INSERT INTO department_table(jp, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
+      await db.run(`INSERT INTO neutral_department_table(ja, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
+      await db.run(`INSERT INTO department_table(ja, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
     }
 
     // add empty data since some (most?) of subjects don't set them
     for (const tbl of ["category_table", "department_table", "course_type_table", "facility_affiliation_table", "office_table"]) {
-      await db.exec(`INSERT INTO ${tbl}(jp, en) VALUES (?,?)`, "", "");
+      await db.run(`INSERT INTO ${tbl}(ja, en) VALUES (?,?)`, "", "");
     }
 
     // permit i==j, since there really are (e.g. 卒業論文 is 4〜4)
     for (let i = 1; i <= 4; i++) {
       for (let j = i; j <= 4; j++) {
-        await db.exec("INSERT INTO grades_table(min, max) VALUES (?,?)", i, j);
+        await db.run("INSERT INTO grades_table(min, max) VALUES (?,?)", i, j);
       }
     }
     // also 0 to denote missing range (e.g. 2〜 is expressed to be 2,0)
     for (let i = 0; i <= 4; i++) {
       // start from 0 as there is a subject without range (応用化学セミナーⅡ)
-      await db.exec("INSERT INTO grades_table(min, max) VALUES (?,?)", i, 0);
+      await db.run("INSERT INTO grades_table(min, max) VALUES (?,?)", i, 0);
     }
   }
 }
@@ -152,7 +183,7 @@ function sanitizeDepsAndYear(input, lang) {
   return input.replace(/[　\s]+/g, "");
 }
 
-async function dbGet(){
+async function dbGet() {
   return await db.get.apply(db, arguments) || {};
 }
 
@@ -295,7 +326,7 @@ async function processPage(lang, year, faculty) {
   // query DB
   const idNoLang = `${year.value}-${timetableId}`;
   const pLangId = await queryLang(lang);
-  const nameId = await queryBilingual("subject", jpnSubjectName, engSubjectName);
+  const nameId = await queryBilingual("name", jpnSubjectName, engSubjectName);
   const neutralDepId = await lookupNeutralDep(sanitizeDepsAndYear(faculty.name, lang));
   const categoryId = await getItemId("category", idNoLang, lang, courseCateg);
   const departmentId = await getItemId("department", idNoLang, lang, departm);
@@ -307,8 +338,8 @@ async function processPage(lang, year, faculty) {
   const officeId = await getItemId("office", idNoLang, lang, office);
 
   // let's insert
-  await db.exec( //
-    `INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
+  await db.run( //
+    `INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
     `${idNoLang}-${lang}`, nameId, +year.value, pLangId, //
     neutralDepId, categoryId, //
     requiem, credits, departmentId, gradesId, //
