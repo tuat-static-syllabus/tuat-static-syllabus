@@ -6,6 +6,7 @@ import { open } from "sqlite";
 
 const browser = await puppeteer.launch({
   headless: false,
+  args: ["--disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
 
@@ -93,8 +94,55 @@ try {
       // now subject list page was shown, let's do scrape each subjects and paging
       let currentPage = 1,
         knownMax = 2;
+
+      // eslint-disable-next-line no-inner-declarations
+      async function reopenOrNextPage(reopen = false) {
+        // check current page number
+        if (reopen && (await inner(await page.$("tr[align=center]:not([style]) span"))) === `${currentPage}`) {
+          return;
+        }
+        // try to go to the next page
+        for (const pageElem of await page.$$("tr[align=center]:not([style]) a")) {
+          const num = parseInt((await inner(pageElem)).trim());
+          // failed to parse
+          if (num !== num) continue;
+          // not worth to click (goes back to previous page)
+          if (!reopen) {
+            if (num <= currentPage) continue;
+          } else {
+            if (num !== currentPage) continue;
+          }
+
+          // voila!
+          currentPage = num;
+          await pageElem.click();
+
+          // eslint-disable-next-line no-constant-condition
+          if (true) await waitNav();
+          else {
+            // wait until next page is shown (waitNav is unreliable)
+            const expectedLeadNumber = `${(currentPage - 1) * 50 + 1}`;
+            console.log(`Expecting index of the top to be ${expectedLeadNumber}`);
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              try {
+                const currentLead = await inner(await page.$("tr[style='background-color:White;'] td"));
+                if (currentLead === expectedLeadNumber) {
+                  await sleep(3000);
+                  break;
+                }
+              } catch (e) {}
+              await sleep(10);
+            }
+          }
+
+          break;
+        }
+      }
+
       do {
         console.log(`Now at page ${currentPage}`);
+        await reopenOrNextPage(true);
         // iterate through 詳細 buttons, in weird way!
         let itemsInPage = await page.$$("input[type=submit][value=詳細]");
         const totalInPage = itemsInPage.length;
@@ -105,8 +153,9 @@ try {
           console.log(`Clicking row ${i}`);
           await sleep(1000);
 
-          // we're allowed to go back by browser's Back button!
-          await page.goBack();
+          // go back to previous list page
+          await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
+          await reopenOrNextPage(true);
           // grab handle again...
           // eslint-disable-next-line no-constant-condition
           while (true) {
@@ -118,9 +167,8 @@ try {
           }
         }
 
-        const pager = await page.$$("tr[align=center]:not([style]) a");
         // get maximum number of pages
-        for (const pageElem of [...pager].reverse()) {
+        for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
           const num = parseInt((await inner(pageElem)).trim());
           // failed to parse (次へ or ...)
           if (num !== num) continue;
@@ -131,21 +179,7 @@ try {
           knownMax = num;
           break;
         }
-
-        // try to go to the next page
-        for (const pageElem of pager) {
-          const num = parseInt((await inner(pageElem)).trim());
-          // failed to parse
-          if (num !== num) continue;
-          // not worth to click (goes back to previous page)
-          if (num <= currentPage) continue;
-
-          // voila!
-          currentPage = num;
-          await pageElem.click();
-          await waitNav();
-          break;
-        }
+        await reopenOrNextPage(false);
       } while (currentPage <= knownMax);
 
       await init();
