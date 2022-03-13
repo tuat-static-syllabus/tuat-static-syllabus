@@ -98,14 +98,14 @@ try {
   for (const year of initialDDs.ddl_year) {
     // console.log(`Working ${year.name}`);
     for (const faculty of initialDDs.ddl_fac.slice(1)) {
-      console.log(`Clicking ${year.name} and ${faculty.name}`);
-      await dropdown("ddl_fac", faculty.value);
+      console.log(`Selecting ${year.name} and ${faculty.name}`);
       await dropdown("ddl_year", year.value, true);
+      await dropdown("ddl_fac", faculty.value);
       await click("btnSearch", true);
 
       // now subject list page was shown, let's do scrape each subjects and paging
-      let currentPage = 11,
-        knownMax = 12;
+      let currentPage = 1,
+        knownMax = 2;
 
       // eslint-disable-next-line no-inner-declarations
       async function reopenPage() {
