@@ -25,6 +25,9 @@ function attr(ee, name) {
 function inner(ee) {
   return page.evaluate((at) => at.innerText, ee);
 }
+async function innerByQuery(q) {
+  return await inner(await page.$(q));
+}
 
 // open the database
 const db = await open({
@@ -39,24 +42,32 @@ const db = await open({
     // id = year-course_code-present_language_id
     // neutral_department_id is for putting department data selected on search page
     // department_id is for the department shown in single page
+    // course_language is for what language being spoken for the lecture (e.g. lectures from McGahan is "English")
+    // and taught_language is for what langage being taught in the lecture (e.g. for subject "フランス語I", it's "French")
+    // https://dictionary.cambridge.org/dictionary/english/year
+
     // create tables
     await db.exec(`
       CREATE TABLE subjects
-          (id string PRIMARY KEY, name text, year integer, present_lang_id integer,
+          (id string PRIMARY KEY, name_id integer, year integer, present_lang_id integer,
            neutral_department_id integer, category_id integer,
-           requirement text, credits integer, department_id integer, grades_id integer,
+           requirement text, credits integer, department_id integer, year_id integer,
            semester_id integer, course_type_id integer, course_code text,
-           instructor text, facility_affiliation_id integer, office_id integer, email text,
+           instructor_id integer, facility_affiliation_id integer, office_id integer, email text,
+
            course_description text, expected_learning text, course_schedule text, prerequisites text,
            texts_and_materials text, _references text, assessment text, message_from_instructor text,
            course_keywords text, office_hours text, remarks_1 text, remarks_2 text, related_url text,
-           course_language text);
+           course_language text, taught_language text, last_update text);
 
-      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name text, lang_code text);
+      CREATE TABLE year_table (id integer PRIMARY KEY AUTOINCREMENT, min integer, max integer);
+
+      CREATE TABLE name_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE instructor_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE category_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE semester_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE course_type_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
@@ -111,8 +122,22 @@ const db = await open({
       await db.exec(`INSERT INTO department_table(jp, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
     }
 
-    // add empty data since some (most?) of subjects are
-    await db.exec("INSERT INTO department_table(jp, en) VALUES (?,?)", "", "");
+    // add empty data since some (most?) of subjects don't set them
+    for (const tbl of ["category_table", "department_table", "course_type_table", "facility_affiliation_table", "office_table"]) {
+      await db.exec("INSERT INTO ?(jp, en) VALUES (?,?)", tbl, "", "");
+    }
+
+    // permit i==j, since there really are (e.g. 卒業論文 is 4〜4)
+    for (let i = 1; i <= 4; i++) {
+      for (let j = i; j <= 4; j++) {
+        await db.exec("INSERT INTO year_table(min, max) VALUES (?,?)", i, j);
+      }
+    }
+    // also 0 to denote missing range (e.g. 2〜 is expressed to be 2,0)
+    for (let i = 0; i <= 4; i++) {
+      // start from 0 as there is a subject without range (応用化学セミナーⅡ)
+      await db.exec("INSERT INTO year_table(min, max) VALUES (?,?)", i, 0);
+    }
   }
 }
 
@@ -120,7 +145,7 @@ function sanitizeDepsAndYear(input, lang) {
   if (lang !== "ja") {
     // only trim spaces at the first and the end, as English uses spaces
     // eslint-disable-next-line no-irregular-whitespace
-    return input.replace(/^[　\s]+/g, "").replace(/[　\s]+$/g, "");
+    return input.replace(/^[　\s[]+/g, "").replace(/[　\s\]]+$/g, "");
   }
   // remove all spaces, including full-width ones
   // eslint-disable-next-line no-irregular-whitespace
@@ -195,7 +220,41 @@ function sleep(ms) {
 }
 
 async function processPage(lang, year, faculty) {
-  await sleep(1000);
+  // for subject name and instructor, both JPN and ENG exist in the page
+  // except them requires to be extracted individually
+  // mispelling of the following variables are made intentional
+  const jpnSubjectName = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_sbj_name"), "en");
+  const engSubjectName = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_sbj_name_e"), "en");
+  const courseCateg = await innerByQuery("span#Detail_lbl_sbj_area_name");
+  const requiem = await innerByQuery("span#Detail_lbl_req_name");
+  const credits = await innerByQuery("span#Detail_lbl_credits");
+  const departm = await innerByQuery("span#Detail_lbl_org_name");
+  const yearMin = await innerByQuery("span#Detail_lbl_grad_min");
+  const yearMax = await innerByQuery("span#Detail_lbl_grad_max");
+  const semest = await innerByQuery("span#Detail_lbl_lct_term_name");
+  const courseType = await innerByQuery("span#Detail_lbl_lct_term_name");
+  const timetableId = await innerByQuery("span#Detail_lbl_lct_cd");
+  const jpnInstr = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_staff_name"), "en");
+  const engInstr = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_staff_name_e"), "en");
+  const affili = await innerByQuery("span#Detail_lbl_section_name");
+  const office = await innerByQuery("span#Detail_lbl_room_name");
+  const emial = await innerByQuery("span#Detail_lbl_e_mail");
+
+  const cDesc = await innerByQuery("span#Detail_lbl_outline");
+  const expLea = await innerByQuery("span#Detail_lbl_standard");
+  const schedule = await innerByQuery("span#Detail_lbl_schedule");
+  const prereq = await innerByQuery("span#Detail_lbl_requirements");
+  const tekst = await innerByQuery("span#Detail_lbl_text_book");
+  const refer = await innerByQuery("span#Detail_lbl_reference_book");
+  const ases = await innerByQuery("span#Detail_lbl_grading");
+  const instrMessage = await innerByQuery("span#Detail_lbl_something");
+  const kewada = await innerByQuery("span#Detail_lbl_keyword");
+  const ofiseHours = await innerByQuery("span#Detail_lbl_office_hours");
+  const remarks1 = await innerByQuery("span#Detail_lbl_note1");
+  const remarks2 = await innerByQuery("span#Detail_lbl_note2");
+  const relaURL = await innerByQuery("span#Detail_lbl_url");
+  const courseLang = await innerByQuery("span#Detail_lbl_num_language_name");
+  const taughtLang = await innerByQuery("span#Detail_lbl_num_sbj_name");
 }
 
 try {
@@ -220,7 +279,7 @@ try {
       async function reopenPage() {
         // check current page number
         {
-          const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
+          const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
           if (displayingPage === `${currentPage}`) {
             return;
           }
@@ -267,7 +326,7 @@ try {
           break;
         }
         {
-          const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
+          const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
           if (displayingPage !== `${currentPage}`) {
             console.log(`WARN: Opening wrong page. ${displayingPage} vs ${currentPage}`);
           }
