@@ -103,6 +103,8 @@ const db = await open({
       CREATE TABLE course_type_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
       CREATE TABLE facility_affiliation_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
       CREATE TABLE office_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+
+      CREATE TABLE resume_info (id INTEGER PRIMARY KEY, lang TEXT, year TEXT, faculty TEXT, page INTEGER, row INTEGER);
     `);
     // add some data that are already known in tables
     await db.run(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
@@ -150,7 +152,6 @@ const db = await open({
     ];
     for (let i = 0; i < japaneseDeps.length; i++) {
       await db.run(`INSERT INTO neutral_department_table(ja, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
-      await db.run(`INSERT INTO department_table(ja, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
     }
 
     // add empty data since some (most?) of subjects don't set them
@@ -236,6 +237,19 @@ async function queryGrades(min, max) {
 
 async function lookupNeutralDep(value) {
   return (await db.get("SELECT id FROM neutral_department_table WHERE ja = ? OR en = ?", value, value)).id;
+}
+
+async function writeResumeInfo(lang, year, faculty, page, row) {
+  await db.run("INSERT INTO resume_info(lang, year, faculty, page, row) VALUES (?,?,?,?,?)", lang, year, faculty, page, row);
+}
+
+async function readResumeInfo() {
+  const resp = await db.get("SELECT lang, year, faculty, page, row FROM resume_info ORDER BY id DESC LIMIT 1;");
+  if (!resp) {
+    return [false, null, null, null, null, null];
+  }
+  const { lang, year, faculty, page, row } = resp;
+  return [true, lang, year, faculty, page, row];
 }
 
 async function findDropdowns() {
@@ -360,6 +374,7 @@ try {
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
   const syllabusLanguage = "ja";
+  const resuming = false;
   for (const year of initialDDs.ddl_year) {
     // console.log(`Working ${year.name}`);
     for (const faculty of initialDDs.ddl_fac.slice(1)) {
@@ -438,6 +453,8 @@ try {
         const totalInPage = itemsInPage.length;
         for (let i = 0; i < totalInPage; i++) {
           console.log(`Clicking row ${i}`);
+          if (!resuming)
+            await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i);
           await itemsInPage[i].click();
           await waitNav();
           await sleep(100);
