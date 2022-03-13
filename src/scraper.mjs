@@ -37,10 +37,12 @@ const db = await open({
   const { "count(name)": tableCount } = await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "subjects");
   if (!tableCount) {
     // id = year-course_code-present_language_id
+    // neutral_department_id is for putting department data selected on search page
+    // department_id is for the department shown in single page
     // create tables
     await db.exec(`
       CREATE TABLE subjects
-          (id string PRIMARY KEY, name text, year integer, present_language_id integer,
+          (id string PRIMARY KEY, name text, year integer, present_lang_id integer,
            neutral_department_id integer, category_id integer,
            requirement text, credits integer, department_id integer, grades_id integer,
            semester_id integer, course_type_id integer, course_code text,
@@ -48,34 +50,101 @@ const db = await open({
            course_description text, expected_learning text, course_schedule text, prerequisites text,
            texts_and_materials text, _references text, assessment text, message_from_instructor text,
            course_keywords text, office_hours text, remarks_1 text, remarks_2 text, related_url text,
-           course_language text)
+           course_language text);
+
+      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name text, lang_code text);
+      CREATE TABLE category_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE semester_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE course_type_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE office_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
     `);
-    await db.exec(`
-      CREATE TABLE present_lang_table (id integer PRIMARY KEY, lang_name text, lang_code text)
-    `);
-    await db.exec(`
-      CREATE TABLE category_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE department_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE grades_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE semester_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE course_type_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    await db.exec(`
-      CREATE TABLE office_table (id integer PRIMARY KEY, jp text, en text)
-    `);
-    // add some more data in it
+    // add some data that are already known in tables
+    await db.exec(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
+    await db.exec(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "English", "en");
+
+    const japaneseDeps = [
+      "農学部",
+      "工学部",
+      "農学府",
+      "農学府（4年制博士課程）",
+      "工学府博士前期",
+      "工学府専門職学位",
+      "工学府博士後期",
+      "工学府博士",
+      "生物システム応用科学府博士前期",
+      "生物システム応用科学府博士後期",
+      "生物システム応用科学府博士",
+      "生物システム応用科学府一貫制博士",
+      "連合農学研究科",
+      "グローバル教育院",
+      "資格科目",
+      "教職科目",
+      "グローバル・プロフェッショナルプログラム",
+      "卓越大学院プログラム",
+    ];
+    const englishDeps = [
+      "Faculty of Agriculture",
+      "Faculty of Engineering",
+      "Graduate School of Agriculture(Master)",
+      "Graduate School of Agriculture(Doctor)",
+      "Graduate School of Engineering(Master)",
+      "Graduate School of Engineering",
+      "Graduate School of Engineering(Doctor)",
+      "Graduate School of Engineering(Doctor)",
+      "Graduate School of Bio-Applications and Systems Engineering(Master)",
+      "Graduate School of Bio-Applications and Systems Engineering(Doctor)",
+      "Graduate School of Bio-Applications and Systems Engineering(Doctor)",
+      "Graduate School of Bio-Applications and Systems Engineering",
+      "United Graduate School of Agricultural Science(Doctor)",
+      "Organization for the Advancement of Education and Global Learning",
+      "License Course",
+      "Teaching Course",
+      "GLOBAL PROFESSIONAL PROGRAM",
+      "WISE PROGRAM",
+    ];
+    for (let i = 0; i < japaneseDeps.length; i++) {
+      await db.exec(`INSERT INTO neutral_department_table(jp, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
+      await db.exec(`INSERT INTO department_table(jp, en) VALUES (?,?)`, japaneseDeps[i], englishDeps[i]);
+    }
+
+    // add empty data since some (most?) of subjects are
+    await db.exec("INSERT INTO department_table(jp, en) VALUES (?,?)", "", "");
   }
+}
+
+function sanitizeDepsAndYear(input, lang) {
+  if (lang !== "ja") {
+    // only trim spaces at the first and the end, as English uses spaces
+    // eslint-disable-next-line no-irregular-whitespace
+    return input.replace(/^[　\s]+/g, "").replace(/[　\s]+$/g, "");
+  }
+  // remove all spaces, including full-width ones
+  // eslint-disable-next-line no-irregular-whitespace
+  return input.replace(/[　\s]+/g, "");
+}
+
+async function getItemId(table, idWoLang, inLang, inText) {
+  // simply query the table
+  const { id: queriedId } = await db.get("SELECT id FROM ? WHERE ? = ?", `${table}_table`, inLang, inText);
+  if (typeof queriedId === "number") {
+    return queriedId;
+  }
+  // find the opposite language from subjects table
+  const oppositeLang = inLang === "ja" ? "en" : "ja";
+  const response = (await db.get("SELECT ? FROM subjects WHERE id = ?", `${table}_id`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
+  if (response === undefined) {
+    // no such subjects; insert with another language lacking
+    await db.exec("INSERT INTO ?(?) VALUES (?)", `${table}_table`, inLang, inText);
+  } else {
+    // update record to complement data
+    await db.exec("UPDATE ? SET ? = ? WHERE id = ?", `${table}_table`, inLang, inText, response);
+  }
+  // lookup again
+  return (await db.get("SELECT id FROM ? WHERE ? = ?", `${table}_table`, inLang, inText)).id;
 }
 
 async function findDropdowns() {
@@ -125,7 +194,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function processPage() {
+async function processPage(lang, year, faculty) {
   await sleep(1000);
 }
 
@@ -134,7 +203,7 @@ try {
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
-  // console.log(initialDDs);
+  const syllabusLanguage = "ja";
   for (const year of initialDDs.ddl_year) {
     // console.log(`Working ${year.name}`);
     for (const faculty of initialDDs.ddl_fac.slice(1)) {
@@ -216,7 +285,7 @@ try {
 
           // scrape the page and put it into database
           console.log(`Clicking row ${i}`);
-          await processPage();
+          await processPage(syllabusLanguage, year, faculty);
 
           // go back to previous list page
           if (!useBack) {
