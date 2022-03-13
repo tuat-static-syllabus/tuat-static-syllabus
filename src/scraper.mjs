@@ -49,14 +49,29 @@ const db = await open({
            texts_and_materials text, _references text, assessment text, message_from_instructor text,
            course_keywords text, office_hours text, remarks_1 text, remarks_2 text, related_url text,
            course_language text)
-
+    `);
+    await db.exec(`
       CREATE TABLE present_lang_table (id integer PRIMARY KEY, lang_name text, lang_code text)
+    `);
+    await db.exec(`
       CREATE TABLE category_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE department_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE grades_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE semester_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE course_type_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    await db.exec(`
       CREATE TABLE office_table (id integer PRIMARY KEY, jp text, en text)
     `);
     // add some more data in it
