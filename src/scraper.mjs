@@ -49,29 +49,29 @@ const db = await open({
     // create tables
     await db.exec(`
       CREATE TABLE subjects
-          (id string PRIMARY KEY, name_id integer, year integer, present_lang_id integer,
-           neutral_department_id integer, category_id integer,
-           requirement text, credits integer, department_id integer, grades_id integer,
-           semester_id integer, course_type_id integer, course_code text,
-           instructor_id integer, facility_affiliation_id integer, office_id integer, email text,
+          (id TEXT PRIMARY KEY, name_id INTEGER, year INTEGER, present_lang_id INTEGER,
+           neutral_department_id INTEGER, category_id INTEGER,
+           requirement TEXT, credits INTEGER, department_id INTEGER, grades_id INTEGER,
+           semester_id INTEGER, course_type_id INTEGER, course_code TEXT,
+           instructor_id INTEGER, facility_affiliation_id INTEGER, office_id INTEGER, email TEXT,
 
-           course_description text, expected_learning text, course_schedule text, prerequisites text,
-           texts_and_materials text, _references text, assessment text, message_from_instructor text,
-           course_keywords text, office_hours text, remarks_1 text, remarks_2 text, related_url text,
-           course_language text, taught_language text, last_update text);
+           course_description TEXT, expected_learning TEXT, course_schedule TEXT, prerequisites TEXT,
+           texts_and_materials TEXT, _references TEXT, assessment TEXT, message_from_instructor TEXT,
+           course_keywords TEXT, office_hours TEXT, remarks_1 TEXT, remarks_2 TEXT, related_url TEXT,
+           course_language TEXT, taught_language TEXT, last_update TEXT);
 
-      CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name text, lang_code text);
-      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, min integer, max integer);
+      CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name TEXT, lang_code TEXT);
+      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, min INTEGER, max INTEGER);
 
-      CREATE TABLE name_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE instructor_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE category_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE department_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE semester_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE course_type_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
-      CREATE TABLE office_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
+      CREATE TABLE name_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE instructor_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE neutral_department_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE category_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE department_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE semester_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE course_type_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
+      CREATE TABLE office_table (id integer PRIMARY KEY AUTOINCREMENT, jp TEXT, en TEXT);
     `);
     // add some data that are already known in tables
     await db.exec(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
