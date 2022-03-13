@@ -31,7 +31,7 @@ async function innerByQuery(q) {
 
 // open the database
 const db = await open({
-  filename: "/tmp/tuat.sqlite",
+  filename: "./syllabus.sqlite",
   driver: sqlite3.Database,
 });
 {
