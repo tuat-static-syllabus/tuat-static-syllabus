@@ -353,7 +353,7 @@ async function processPage(lang, year, faculty) {
 
   // let's insert
   await db.run( //
-    `INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
+    `INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
     `${idNoLang}-${lang}`, nameId, +year.value, pLangId, //
     neutralDepId, categoryId, //
     requiem, credits, departmentId, gradesId, //
@@ -373,11 +373,22 @@ try {
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
-  const resuming = false;
+  let [resuming, _lang, _year, _faculty, _page, _row] = await readResumeInfo();
+  if(resuming){
+    console.log(`Resuming from: ${_lang}, ${_year}, ${_faculty}, ${_page}, ${_row}`)
+  }
   for (const syllabusLanguage of ["ja",]) {
+    if (resuming && syllabusLanguage !== _lang)
+      continue;
+
     for (const year of initialDDs.ddl_year) {
-      // console.log(`Working ${year.name}`);
+      if (resuming && year.value !== _year)
+        continue;
+
       for (const faculty of initialDDs.ddl_fac.slice(1)) {
+        if (resuming && faculty.value !== _faculty)
+          continue;
+
         if (syllabusLanguage === "en") {
           console.log("Switching language");
           await click("SelectLanguage1_imgJE", true);
@@ -390,6 +401,11 @@ try {
         // now subject list page was shown, let's do scrape each subjects and paging
         let currentPage = 1,
           knownMax = 2;
+
+        if (resuming) {
+          currentPage = +_page;
+          knownMax = currentPage + 1;
+        }
 
         // eslint-disable-next-line no-inner-declarations
         async function reopenPage() {
@@ -456,6 +472,11 @@ try {
           let itemsInPage = await page.$$("input[type=submit][value=詳細]");
           const totalInPage = itemsInPage.length;
           for (let i = 0; i < totalInPage; i++) {
+            if (resuming) {
+              i = +_row;
+              // resume is completed
+              resuming = false;
+            }
             console.log(`Clicking row ${i}`);
             if (!resuming)
               await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i);
