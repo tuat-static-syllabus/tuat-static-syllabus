@@ -374,7 +374,7 @@ try {
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
   let [resuming, _lang, _year, _faculty, _page, _row] = await readResumeInfo();
-  if(resuming){
+  if (resuming) {
     console.log(`Resuming from: ${_lang}, ${_year}, ${_faculty}, ${_page}, ${_row}`)
   }
   for (const syllabusLanguage of ["ja",]) {
@@ -385,7 +385,10 @@ try {
       if (resuming && year.value !== _year)
         continue;
 
-      for (const faculty of initialDDs.ddl_fac.slice(1)) {
+      await dropdown("ddl_year", year.value, true);
+      const yearSelectedDDs = await findDropdowns();
+
+      for (const faculty of yearSelectedDDs.ddl_fac.slice(1)) {
         if (resuming && faculty.value !== _faculty)
           continue;
 
