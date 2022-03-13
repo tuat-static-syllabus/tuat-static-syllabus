@@ -39,19 +39,19 @@ const db = await open({
 {
   const { "count(name)": tableCount } = await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "subjects");
   if (!tableCount) {
-    // id = year-course_code-present_language_id
+    // id = year-course_code-present_language.code
     // neutral_department_id is for putting department data selected on search page
     // department_id is for the department shown in single page
     // course_language is for what language being spoken for the lecture (e.g. lectures from McGahan is "English")
     // and taught_language is for what langage being taught in the lecture (e.g. for subject "フランス語I", it's "French")
-    // https://dictionary.cambridge.org/dictionary/english/year
+    // using "Grades" for Year shown in DetailMain since it's confusing with annual year (e.g. 2021, 2022)
 
     // create tables
     await db.exec(`
       CREATE TABLE subjects
           (id string PRIMARY KEY, name_id integer, year integer, present_lang_id integer,
            neutral_department_id integer, category_id integer,
-           requirement text, credits integer, department_id integer, year_id integer,
+           requirement text, credits integer, department_id integer, grades_id integer,
            semester_id integer, course_type_id integer, course_code text,
            instructor_id integer, facility_affiliation_id integer, office_id integer, email text,
 
@@ -61,7 +61,7 @@ const db = await open({
            course_language text, taught_language text, last_update text);
 
       CREATE TABLE present_lang_table (id integer PRIMARY KEY AUTOINCREMENT, lang_name text, lang_code text);
-      CREATE TABLE year_table (id integer PRIMARY KEY AUTOINCREMENT, min integer, max integer);
+      CREATE TABLE grades_table (id integer PRIMARY KEY AUTOINCREMENT, min integer, max integer);
 
       CREATE TABLE name_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
       CREATE TABLE instructor_table (id integer PRIMARY KEY AUTOINCREMENT, jp text, en text);
@@ -130,13 +130,13 @@ const db = await open({
     // permit i==j, since there really are (e.g. 卒業論文 is 4〜4)
     for (let i = 1; i <= 4; i++) {
       for (let j = i; j <= 4; j++) {
-        await db.exec("INSERT INTO year_table(min, max) VALUES (?,?)", i, j);
+        await db.exec("INSERT INTO grades_table(min, max) VALUES (?,?)", i, j);
       }
     }
     // also 0 to denote missing range (e.g. 2〜 is expressed to be 2,0)
     for (let i = 0; i <= 4; i++) {
       // start from 0 as there is a subject without range (応用化学セミナーⅡ)
-      await db.exec("INSERT INTO year_table(min, max) VALUES (?,?)", i, 0);
+      await db.exec("INSERT INTO grades_table(min, max) VALUES (?,?)", i, 0);
     }
   }
 }
@@ -170,6 +170,10 @@ async function getItemId(table, idWoLang, inLang, inText) {
   }
   // lookup again
   return (await db.get("SELECT id FROM ? WHERE ? = ?", `${table}_table`, inLang, inText)).id;
+}
+
+async function lookupNeutralDep(value) {
+  return (await db.get("SELECT id FROM neutral_department_table WHERE ja = ? OR en = ?", value, value)).id;
 }
 
 async function findDropdowns() {
@@ -255,6 +259,21 @@ async function processPage(lang, year, faculty) {
   const relaURL = await innerByQuery("span#Detail_lbl_url");
   const courseLang = await innerByQuery("span#Detail_lbl_num_language_name");
   const taughtLang = await innerByQuery("span#Detail_lbl_num_sbj_name");
+  const lastUpda = await innerByQuery("span#Detail_lbl_update_dt");
+
+  await db.exec( //
+    `INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
+    `${year.value}-${timetableId}-${lang}`, name_id, +year.value, present_lang_id, // eslint-disable-line no-undef 
+    neutral_department_id, category_id, // eslint-disable-line no-undef
+    requiem, +credits, department_id, grades_id, // eslint-disable-line no-undef
+    semester_id, course_type_id, timetableId, // eslint-disable-line no-undef
+    instructor_id, facility_affiliation_id, office_id, emial, // eslint-disable-line no-undef
+
+    cDesc, expLea, schedule, prereq, //
+    tekst, refer, ases, instrMessage, //
+    kewada, ofiseHours, remarks1, remarks2, relaURL, //
+    courseLang, taughtLang, lastUpda, //
+  );
 }
 
 try {

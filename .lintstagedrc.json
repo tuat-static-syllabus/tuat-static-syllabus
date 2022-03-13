@@ -1,4 +1,4 @@
 {
-  "*.{m,}js": ["prettier --print-width 200 --write", "eslint"],
+  "*.{m,}js": ["eslint"],
   "*.json": ["prettier --print-width 200 --write"]
 }
