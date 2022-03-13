@@ -381,7 +381,7 @@ try {
     if (resuming && syllabusLanguage !== _lang)
       continue;
 
-    for (const year of initialDDs.ddl_year) {
+    for (const year of [...initialDDs.ddl_year].reverse()) {
       if (resuming && year.value !== _year)
         continue;
 
