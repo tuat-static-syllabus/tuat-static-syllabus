@@ -124,7 +124,7 @@ const db = await open({
 
     // add empty data since some (most?) of subjects don't set them
     for (const tbl of ["category_table", "department_table", "course_type_table", "facility_affiliation_table", "office_table"]) {
-      await db.exec("INSERT INTO ?(jp, en) VALUES (?,?)", tbl, "", "");
+      await db.exec(`INSERT INTO ${tbl}(jp, en) VALUES (?,?)`, "", "");
     }
 
     // permit i==j, since there really are (e.g. 卒業論文 is 4〜4)
@@ -152,15 +152,19 @@ function sanitizeDepsAndYear(input, lang) {
   return input.replace(/[　\s]+/g, "");
 }
 
+async function dbGet(){
+  return await db.get.apply(db, arguments) || {};
+}
+
 async function getItemId(table, idWoLang, inLang, inText) {
   // simply query the table
-  const { id: queriedId } = await db.get(`SELECT id FROM ${table}_table WHERE ${inLang} = ?`, inText);
+  const { id: queriedId } = await dbGet(`SELECT id FROM ${table}_table WHERE ${inLang} = ?`, inText);
   if (typeof queriedId === "number") {
     return queriedId;
   }
   // find the opposite language from subjects table
   const oppositeLang = inLang === "ja" ? "en" : "ja";
-  const response = (await db.get(`SELECT ${table}_id FROM subjects WHERE id = ?`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
+  const response = (await dbGet(`SELECT ${table}_id FROM subjects WHERE id = ?`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
   if (response === undefined) {
     // no such subject; insert with another language missing
     return (await db.run(`INSERT INTO ${table}_table(${inLang}) VALUES (?)`, inText)).lastID;
@@ -174,11 +178,11 @@ async function getItemId(table, idWoLang, inLang, inText) {
 async function queryBilingual(table, ja, en) {
   let result;
   if (ja && en) {
-    result = (await db.get(`SELECT id FROM ${table}_table WHERE ja = ? AND en = ?`, ja, en)).id;
+    result = (await dbGet(`SELECT id FROM ${table}_table WHERE ja = ? AND en = ?`, ja, en)).id;
   } else if (ja && !en) {
-    result = (await db.get(`SELECT id FROM ${table}_table WHERE ja = ?`, ja)).id;
+    result = (await dbGet(`SELECT id FROM ${table}_table WHERE ja = ?`, ja)).id;
   } else if (!ja && en) {
-    result = (await db.get(`SELECT id FROM ${table}_table WHERE en = ?`, en)).id;
+    result = (await dbGet(`SELECT id FROM ${table}_table WHERE en = ?`, en)).id;
   }
   if (result !== undefined) {
     return result;
@@ -192,7 +196,7 @@ async function queryLang(langCode) {
 
 async function queryGrades(min, max) {
   min = +min, max = +max;
-  const result = (await db.get("SELECT id FROM grades_table WHERE min = ? AND max = ?", min, max)).id;
+  const result = (await dbGet("SELECT id FROM grades_table WHERE min = ? AND max = ?", min, max)).id;
   if (result !== undefined) {
     return result;
   }
@@ -402,10 +406,12 @@ try {
         let itemsInPage = await page.$$("input[type=submit][value=詳細]");
         const totalInPage = itemsInPage.length;
         for (let i = 0; i < totalInPage; i++) {
+          console.log(`Clicking row ${i}`);
           await itemsInPage[i].click();
+          await waitNav();
+          await sleep(100);
 
           // scrape the page and put it into database
-          console.log(`Clicking row ${i}`);
           await processPage(syllabusLanguage, year, faculty);
 
           // go back to previous list page
