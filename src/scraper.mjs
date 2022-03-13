@@ -31,6 +31,13 @@ const db = await open({
   driver: sqlite3.Database,
 });
 
+// prepare tables
+console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "subjects"));
+
+console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "teachers"));
+
+console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "target_grades"));
+
 async function findDropdowns() {
   const dd = await page.$$("select");
   const dropDowns = {};
@@ -78,6 +85,10 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function processPage() {
+  await sleep(1000);
+}
+
 try {
   // start the session; beginning of our fight with the insanely and unnecessarily stateful website
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
@@ -97,9 +108,10 @@ try {
         knownMax = 12;
 
       // eslint-disable-next-line no-inner-declarations
-      async function reopenOrNextPage(reopen = false) {
+      async function reopenPage() {
         // check current page number
-        if (reopen && (await inner(await page.$("tr[align=center]:not([style]) span"))) === `${currentPage}`) {
+        const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
+        if (displayingPage === `${currentPage}`) {
           return;
         }
         // try to go to the next page
@@ -134,15 +146,10 @@ try {
           // failed to parse
           if (num !== num) continue;
           // not worth to click (goes back to previous page)
-          if (!reopen) {
-            if (num <= currentPage) continue;
-          } else {
-            if (num !== currentPage) continue;
-          }
+          if (num !== currentPage) continue;
 
           // voila!
           console.log(`Clicking page ${num}`);
-          currentPage = num;
           await pageElem.click();
 
           // eslint-disable-next-line no-constant-condition
@@ -169,8 +176,8 @@ try {
       }
 
       do {
+        await reopenPage();
         console.log(`Now at page ${currentPage}`);
-        if (!useBack) await reopenOrNextPage(true);
         // iterate through 詳細 buttons, in weird way!
         let itemsInPage = await page.$$("input[type=submit][value=詳細]");
         const totalInPage = itemsInPage.length;
@@ -179,12 +186,12 @@ try {
 
           // scrape the page and put it into database
           console.log(`Clicking row ${i}`);
-          await sleep(1000);
+          await processPage();
 
           // go back to previous list page
           if (!useBack) {
             await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
-            await reopenOrNextPage(true);
+            await reopenPage();
           } else {
             await page.goBack();
           }
@@ -211,7 +218,7 @@ try {
           knownMax = num;
           break;
         }
-        await reopenOrNextPage(false);
+        currentPage++;
       } while (currentPage <= knownMax);
 
       await init();
