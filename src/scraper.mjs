@@ -9,6 +9,7 @@ const browser = await puppeteer.launch({
   args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
+// DO NOT TURN THIS TO TRUE; or chromium break with ERR_CACHE_MISS error which can't be countered
 const useBack = false;
 
 page.on("requestfailed", async (request) => {
@@ -32,11 +33,35 @@ const db = await open({
 });
 
 // prepare tables
-console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "subjects"));
+{
+  const { "count(name)": tableCount } = await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "subjects");
+  if (!tableCount) {
+    // id = year-course_code-present_language_id
+    // create tables
+    await db.exec(`
+      CREATE TABLE subjects
+          (id string PRIMARY KEY, name text, year integer, present_language_id integer,
+           neutral_department_id integer, category_id integer,
+           requirement text, credits integer, department_id integer, grades_id integer,
+           semester_id integer, course_type_id integer, course_code text,
+           instructor text, facility_affiliation_id integer, office_id integer, email text,
+           course_description text, expected_learning text, course_schedule text, prerequisites text,
+           texts_and_materials text, _references text, assessment text, message_from_instructor text,
+           course_keywords text, office_hours text, remarks_1 text, remarks_2 text, related_url text,
+           course_language text)
 
-console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "teachers"));
-
-console.log(await db.get("SELECT count(name) FROM sqlite_master WHERE type=? AND name=?", "table", "target_grades"));
+      CREATE TABLE present_lang_table (id integer PRIMARY KEY, lang_name text, lang_code text)
+      CREATE TABLE category_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE department_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE grades_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE semester_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE course_type_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE facility_affiliation_table (id integer PRIMARY KEY, jp text, en text)
+      CREATE TABLE office_table (id integer PRIMARY KEY, jp text, en text)
+    `);
+    // add some more data in it
+  }
+}
 
 async function findDropdowns() {
   const dd = await page.$$("select");
@@ -160,7 +185,7 @@ try {
         {
           const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
           if (displayingPage !== `${currentPage}`) {
-            console.log(`WARN: Opening wrong page ${displayingPage} vs ${currentPage}`);
+            console.log(`WARN: Opening wrong page. ${displayingPage} vs ${currentPage}`);
           }
         }
       }
