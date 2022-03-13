@@ -110,9 +110,11 @@ try {
       // eslint-disable-next-line no-inner-declarations
       async function reopenPage() {
         // check current page number
-        const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
-        if (displayingPage === `${currentPage}`) {
-          return;
+        {
+          const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
+          if (displayingPage === `${currentPage}`) {
+            return;
+          }
         }
         // try to go to the next page
         let pages;
@@ -152,26 +154,14 @@ try {
           console.log(`Clicking page ${num}`);
           await pageElem.click();
 
-          // eslint-disable-next-line no-constant-condition
-          if (true) await waitNav();
-          else {
-            // wait until next page is shown (waitNav is unreliable)
-            const expectedLeadNumber = `${(currentPage - 1) * 50 + 1}`;
-            console.log(`Expecting index of the top to be ${expectedLeadNumber}`);
-            // eslint-disable-next-line no-constant-condition
-            while (true) {
-              try {
-                const currentLead = await inner(await page.$("tr[style='background-color:White;'] td"));
-                if (currentLead === expectedLeadNumber) {
-                  await sleep(3000);
-                  break;
-                }
-              } catch (e) {}
-              await sleep(10);
-            }
-          }
-
+          await waitNav();
           break;
+        }
+        {
+          const displayingPage = await inner(await page.$("tr[align=center]:not([style]) span"));
+          if (displayingPage !== `${currentPage}`) {
+            console.log(`WARN: Opening wrong page ${displayingPage} vs ${currentPage}`);
+          }
         }
       }
 
