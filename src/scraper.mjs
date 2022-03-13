@@ -373,129 +373,134 @@ try {
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
-  const syllabusLanguage = "ja";
   const resuming = false;
-  for (const year of initialDDs.ddl_year) {
-    // console.log(`Working ${year.name}`);
-    for (const faculty of initialDDs.ddl_fac.slice(1)) {
-      console.log(`Selecting ${year.name} and ${faculty.name}`);
-      await dropdown("ddl_year", year.value, true);
-      await dropdown("ddl_fac", faculty.value);
-      await click("btnSearch", true);
-
-      // now subject list page was shown, let's do scrape each subjects and paging
-      let currentPage = 1,
-        knownMax = 2;
-
-      // eslint-disable-next-line no-inner-declarations
-      async function reopenPage() {
-        // check current page number
-        {
-          const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
-          if (displayingPage === `${currentPage}`) {
-            return;
-          }
+  for (const syllabusLanguage of ["ja",]) {
+    for (const year of initialDDs.ddl_year) {
+      // console.log(`Working ${year.name}`);
+      for (const faculty of initialDDs.ddl_fac.slice(1)) {
+        if (syllabusLanguage === "en") {
+          console.log("Switching language");
+          await click("SelectLanguage1_imgJE", true);
         }
-        // try to go to the next page
-        let pages;
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          pages = await page.$$("tr[align=center]:not([style]) a");
-          const pageLinks = [];
-          for (const pageElem of pages) {
-            pageLinks.push((await inner(pageElem)).trim());
-          }
-          const exLink = pageLinks.indexOf("...");
-          // eslint-disable-next-line eqeqeq
-          if (exLink != -1 && parseInt(pageLinks[exLink - 1]) < currentPage) {
-            // the target page is beyond the maximum shown
-            const mk = parseInt(pageLinks[exLink - 1]);
-            console.log(`Expanding more pages... now: ${mk}`);
-            if (mk > knownMax) {
-              console.log(`Updating known maximum: ${knownMax} => ${mk}`);
-              knownMax = mk;
+        console.log(`Selecting ${year.name} and ${faculty.name}`);
+        await dropdown("ddl_year", year.value, true);
+        await dropdown("ddl_fac", faculty.value);
+        await click("btnSearch", true);
+
+        // now subject list page was shown, let's do scrape each subjects and paging
+        let currentPage = 1,
+          knownMax = 2;
+
+        // eslint-disable-next-line no-inner-declarations
+        async function reopenPage() {
+          // check current page number
+          {
+            const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
+            if (displayingPage === `${currentPage}`) {
+              return;
             }
-            await pages[exLink].click();
-            await waitNav();
-          } else {
-            break;
           }
-        }
-        // await sleep(10000);
-
-        for (const pageElem of pages) {
-          const num = parseInt((await inner(pageElem)).trim());
-          // failed to parse
-          if (num !== num) continue;
-          // not worth to click (goes back to previous page)
-          if (num !== currentPage) continue;
-
-          // voila!
-          console.log(`Clicking page ${num}`);
-          await pageElem.click();
-
-          await waitNav();
-          break;
-        }
-        {
-          const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
-          if (displayingPage !== `${currentPage}`) {
-            console.log(`WARN: Opening wrong page. ${displayingPage} vs ${currentPage}`);
-          }
-        }
-      }
-
-      do {
-        await reopenPage();
-        console.log(`Now at page ${currentPage}`);
-        // iterate through 詳細 buttons, in weird way!
-        let itemsInPage = await page.$$("input[type=submit][value=詳細]");
-        const totalInPage = itemsInPage.length;
-        for (let i = 0; i < totalInPage; i++) {
-          console.log(`Clicking row ${i}`);
-          if (!resuming)
-            await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i);
-          await itemsInPage[i].click();
-          await waitNav();
-          await sleep(100);
-
-          // scrape the page and put it into database
-          await processPage(syllabusLanguage, year, faculty);
-
-          // go back to previous list page
-          if (!useBack) {
-            await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
-            await reopenPage();
-          } else {
-            await page.goBack();
-          }
-          // grab handle again...
+          // try to go to the next page
+          let pages;
           // eslint-disable-next-line no-constant-condition
           while (true) {
-            itemsInPage = await page.$$("input[type=submit][value=詳細]");
-            if (itemsInPage.length === totalInPage) break;
+            pages = await page.$$("tr[align=center]:not([style]) a");
+            const pageLinks = [];
+            for (const pageElem of pages) {
+              pageLinks.push((await inner(pageElem)).trim());
+            }
+            const exLink = pageLinks.indexOf("...");
+            // eslint-disable-next-line eqeqeq
+            if (exLink != -1 && parseInt(pageLinks[exLink - 1]) < currentPage) {
+              // the target page is beyond the maximum shown
+              const mk = parseInt(pageLinks[exLink - 1]);
+              console.log(`Expanding more pages... now: ${mk}`);
+              if (mk > knownMax) {
+                console.log(`Updating known maximum: ${knownMax} => ${mk}`);
+                knownMax = mk;
+              }
+              await pages[exLink].click();
+              await waitNav();
+            } else {
+              break;
+            }
+          }
+          // await sleep(10000);
 
-            await sleep(10);
-            continue;
+          for (const pageElem of pages) {
+            const num = parseInt((await inner(pageElem)).trim());
+            // failed to parse
+            if (num !== num) continue;
+            // not worth to click (goes back to previous page)
+            if (num !== currentPage) continue;
+
+            // voila!
+            console.log(`Clicking page ${num}`);
+            await pageElem.click();
+
+            await waitNav();
+            break;
+          }
+          {
+            const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
+            if (displayingPage !== `${currentPage}`) {
+              console.log(`WARN: Opening wrong page. ${displayingPage} vs ${currentPage}`);
+            }
           }
         }
 
-        // get maximum number of pages
-        for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
-          const num = parseInt((await inner(pageElem)).trim());
-          // failed to parse (次へ or ...)
-          if (num !== num) continue;
-          // we're already on last page
-          if (num <= knownMax) break;
-          if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+        do {
+          await reopenPage();
+          console.log(`Now at page ${currentPage}`);
+          // iterate through 詳細 buttons, in weird way!
+          let itemsInPage = await page.$$("input[type=submit][value=詳細]");
+          const totalInPage = itemsInPage.length;
+          for (let i = 0; i < totalInPage; i++) {
+            console.log(`Clicking row ${i}`);
+            if (!resuming)
+              await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i);
+            await itemsInPage[i].click();
+            await waitNav();
+            await sleep(100);
 
-          knownMax = num;
-          break;
-        }
-        currentPage++;
-      } while (currentPage <= knownMax);
+            // scrape the page and put it into database
+            await processPage(syllabusLanguage, year, faculty);
 
-      await init();
+            // go back to previous list page
+            if (!useBack) {
+              await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
+              await reopenPage();
+            } else {
+              await page.goBack();
+            }
+            // grab handle again...
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              itemsInPage = await page.$$("input[type=submit][value=詳細]");
+              if (itemsInPage.length === totalInPage) break;
+
+              await sleep(10);
+              continue;
+            }
+          }
+
+          // get maximum number of pages
+          for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
+            const num = parseInt((await inner(pageElem)).trim());
+            // failed to parse (次へ or ...)
+            if (num !== num) continue;
+            // we're already on last page
+            if (num <= knownMax) break;
+            if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+
+            knownMax = num;
+            break;
+          }
+          currentPage++;
+        } while (currentPage <= knownMax);
+
+        await init();
+      }
     }
   }
 } catch (e) {
