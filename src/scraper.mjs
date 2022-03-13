@@ -403,11 +403,10 @@ try {
 
         // now subject list page was shown, let's do scrape each subjects and paging
         let currentPage = 1,
-          knownMax = 2;
+          knownMax = 1;
 
         if (resuming) {
-          currentPage = +_page;
-          knownMax = currentPage + 1;
+          currentPage = knownMax = +_page;
         }
 
         // eslint-disable-next-line no-inner-declarations
