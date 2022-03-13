@@ -6,9 +6,10 @@ import { open } from "sqlite";
 
 const browser = await puppeteer.launch({
   headless: false,
-  args: ["--disable-prompt-on-repost"],
+  args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
+const useBack = false;
 
 page.on("requestfailed", async (request) => {
   console.log(`url: ${request.url()}, errText: ${request.failure().errorText}, method: ${request.method()}`);
@@ -92,8 +93,8 @@ try {
       await click("btnSearch", true);
 
       // now subject list page was shown, let's do scrape each subjects and paging
-      let currentPage = 1,
-        knownMax = 2;
+      let currentPage = 11,
+        knownMax = 12;
 
       // eslint-disable-next-line no-inner-declarations
       async function reopenOrNextPage(reopen = false) {
@@ -102,7 +103,33 @@ try {
           return;
         }
         // try to go to the next page
-        for (const pageElem of await page.$$("tr[align=center]:not([style]) a")) {
+        let pages;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          pages = await page.$$("tr[align=center]:not([style]) a");
+          const pageLinks = [];
+          for (const pageElem of pages) {
+            pageLinks.push((await inner(pageElem)).trim());
+          }
+          const exLink = pageLinks.indexOf("...");
+          // eslint-disable-next-line eqeqeq
+          if (exLink != -1 && parseInt(pageLinks[exLink - 1]) < currentPage) {
+            // the target page is beyond the maximum shown
+            const mk = parseInt(pageLinks[exLink - 1]);
+            console.log(`Expanding more pages... now: ${mk}`);
+            if (mk > knownMax) {
+              console.log(`Updating known maximum: ${knownMax} => ${mk}`);
+              knownMax = mk;
+            }
+            await pages[exLink].click();
+            await waitNav();
+          } else {
+            break;
+          }
+        }
+        // await sleep(10000);
+
+        for (const pageElem of pages) {
           const num = parseInt((await inner(pageElem)).trim());
           // failed to parse
           if (num !== num) continue;
@@ -114,6 +141,7 @@ try {
           }
 
           // voila!
+          console.log(`Clicking page ${num}`);
           currentPage = num;
           await pageElem.click();
 
@@ -142,7 +170,7 @@ try {
 
       do {
         console.log(`Now at page ${currentPage}`);
-        await reopenOrNextPage(true);
+        if (!useBack) await reopenOrNextPage(true);
         // iterate through 詳細 buttons, in weird way!
         let itemsInPage = await page.$$("input[type=submit][value=詳細]");
         const totalInPage = itemsInPage.length;
@@ -154,8 +182,12 @@ try {
           await sleep(1000);
 
           // go back to previous list page
-          await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
-          await reopenOrNextPage(true);
+          if (!useBack) {
+            await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
+            await reopenOrNextPage(true);
+          } else {
+            await page.goBack();
+          }
           // grab handle again...
           // eslint-disable-next-line no-constant-condition
           while (true) {
