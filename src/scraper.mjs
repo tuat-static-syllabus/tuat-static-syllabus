@@ -154,19 +154,19 @@ function sanitizeDepsAndYear(input, lang) {
 
 async function getItemId(table, idWoLang, inLang, inText) {
   // simply query the table
-  const { id: queriedId } = await db.get("SELECT id FROM ? WHERE ? = ?", `${table}_table`, inLang, inText);
+  const { id: queriedId } = await db.get(`SELECT id FROM ${table}_table WHERE ${inLang} = ?`, inText);
   if (typeof queriedId === "number") {
     return queriedId;
   }
   // find the opposite language from subjects table
   const oppositeLang = inLang === "ja" ? "en" : "ja";
-  const response = (await db.get("SELECT ? FROM subjects WHERE id = ?", `${table}_id`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
+  const response = (await db.get(`SELECT ${table}_id FROM subjects WHERE id = ?`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
   if (response === undefined) {
-    // no such subjects; insert with another language missing
-    return (await db.run("INSERT INTO ?(?) VALUES (?)", `${table}_table`, inLang, inText)).lastID;
+    // no such subject; insert with another language missing
+    return (await db.run(`INSERT INTO ${table}_table(${inLang}) VALUES (?)`, inText)).lastID;
   } else {
     // update record to complement data
-    await db.exec("UPDATE ? SET ? = ? WHERE id = ?", `${table}_table`, inLang, inText, response);
+    await db.exec(`UPDATE ${table}_table SET ${inLang} = ? WHERE id = ?`, inText, response);
     return response;
   }
 }
@@ -174,16 +174,16 @@ async function getItemId(table, idWoLang, inLang, inText) {
 async function queryBilingual(table, ja, en) {
   let result;
   if (ja && en) {
-    result = (await db.get("SELECT id FROM ? WHERE ja = ? AND en = ?", `${table}_table`, ja, en)).id;
+    result = (await db.get(`SELECT id FROM ${table}_table WHERE ja = ? AND en = ?`, ja, en)).id;
   } else if (ja && !en) {
-    result = (await db.get("SELECT id FROM ? WHERE ja = ?", `${table}_table`, ja)).id;
+    result = (await db.get(`SELECT id FROM ${table}_table WHERE ja = ?`, ja)).id;
   } else if (!ja && en) {
-    result = (await db.get("SELECT id FROM ? WHERE en = ?", `${table}_table`, en)).id;
+    result = (await db.get(`SELECT id FROM ${table}_table WHERE en = ?`, en)).id;
   }
   if (result !== undefined) {
     return result;
   }
-  return (await db.run("INSERT INTO ?(ja, en) VALUES (?,?)", `${table}_table`, ja, en)).lastID;
+  return (await db.run(`INSERT INTO ${table}_table(ja, en) VALUES (?,?)`, ja, en)).lastID;
 }
 
 async function queryLang(langCode) {
