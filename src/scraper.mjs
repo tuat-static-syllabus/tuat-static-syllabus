@@ -162,14 +162,41 @@ async function getItemId(table, idWoLang, inLang, inText) {
   const oppositeLang = inLang === "ja" ? "en" : "ja";
   const response = (await db.get("SELECT ? FROM subjects WHERE id = ?", `${table}_id`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
   if (response === undefined) {
-    // no such subjects; insert with another language lacking
-    await db.exec("INSERT INTO ?(?) VALUES (?)", `${table}_table`, inLang, inText);
+    // no such subjects; insert with another language missing
+    return (await db.run("INSERT INTO ?(?) VALUES (?)", `${table}_table`, inLang, inText)).lastID;
   } else {
     // update record to complement data
     await db.exec("UPDATE ? SET ? = ? WHERE id = ?", `${table}_table`, inLang, inText, response);
+    return response;
   }
-  // lookup again
-  return (await db.get("SELECT id FROM ? WHERE ? = ?", `${table}_table`, inLang, inText)).id;
+}
+
+async function queryBilingual(table, ja, en) {
+  let result;
+  if (ja && en) {
+    result = (await db.get("SELECT id FROM ? WHERE ja = ? AND en = ?", `${table}_table`, ja, en)).id;
+  } else if (ja && !en) {
+    result = (await db.get("SELECT id FROM ? WHERE ja = ?", `${table}_table`, ja)).id;
+  } else if (!ja && en) {
+    result = (await db.get("SELECT id FROM ? WHERE en = ?", `${table}_table`, en)).id;
+  }
+  if (result !== undefined) {
+    return result;
+  }
+  return (await db.run("INSERT INTO ?(ja, en) VALUES (?,?)", `${table}_table`, ja, en)).lastID;
+}
+
+async function queryLang(langCode) {
+  return (await db.get("SELECT id FROM present_lang_table WHERE lang_code = ?", langCode)).id;
+}
+
+async function queryGrades(min, max) {
+  min = +min, max = +max;
+  const result = (await db.get("SELECT id FROM grades_table WHERE min = ? AND max = ?", min, max)).id;
+  if (result !== undefined) {
+    return result;
+  }
+  return (await db.run("INSERT INTO grades_table(min, max) VALUES (?,?)", min, max)).lastID;
 }
 
 async function lookupNeutralDep(value) {
@@ -231,7 +258,7 @@ async function processPage(lang, year, faculty) {
   const engSubjectName = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_sbj_name_e"), "en");
   const courseCateg = await innerByQuery("span#Detail_lbl_sbj_area_name");
   const requiem = await innerByQuery("span#Detail_lbl_req_name");
-  const credits = await innerByQuery("span#Detail_lbl_credits");
+  const credits = +(await innerByQuery("span#Detail_lbl_credits")).trim();
   const departm = await innerByQuery("span#Detail_lbl_org_name");
   const yearMin = await innerByQuery("span#Detail_lbl_grad_min");
   const yearMax = await innerByQuery("span#Detail_lbl_grad_max");
@@ -261,19 +288,35 @@ async function processPage(lang, year, faculty) {
   const taughtLang = await innerByQuery("span#Detail_lbl_num_sbj_name");
   const lastUpda = await innerByQuery("span#Detail_lbl_update_dt");
 
+  // query DB
+  const idNoLang = `${year.value}-${timetableId}`;
+  const pLangId = await queryLang(lang);
+  const nameId = await queryBilingual("subject", jpnSubjectName, engSubjectName);
+  const neutralDepId = await lookupNeutralDep(sanitizeDepsAndYear(faculty.name, lang));
+  const categoryId = await getItemId("category", idNoLang, lang, courseCateg);
+  const departmentId = await getItemId("department", idNoLang, lang, departm);
+  const gradesId = await queryGrades(yearMin, yearMax);
+  const semesterId = await getItemId("semester", idNoLang, lang, semest);
+  const courseTypeId = await getItemId("course_type", idNoLang, lang, courseType);
+  const instructorId = await queryBilingual("instructor", jpnInstr, engInstr);
+  const facilityAffiliationId = await getItemId("facility_affiliation", idNoLang, lang, affili);
+  const officeId = await getItemId("office", idNoLang, lang, office);
+
+  // let's insert
   await db.exec( //
     `INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
-    `${year.value}-${timetableId}-${lang}`, name_id, +year.value, present_lang_id, // eslint-disable-line no-undef 
-    neutral_department_id, category_id, // eslint-disable-line no-undef
-    requiem, +credits, department_id, grades_id, // eslint-disable-line no-undef
-    semester_id, course_type_id, timetableId, // eslint-disable-line no-undef
-    instructor_id, facility_affiliation_id, office_id, emial, // eslint-disable-line no-undef
+    `${idNoLang}-${lang}`, nameId, +year.value, pLangId, //
+    neutralDepId, categoryId, //
+    requiem, credits, departmentId, gradesId, //
+    semesterId, courseTypeId, timetableId, //
+    instructorId, facilityAffiliationId, officeId, emial, //
 
     cDesc, expLea, schedule, prereq, //
     tekst, refer, ases, instrMessage, //
     kewada, ofiseHours, remarks1, remarks2, relaURL, //
     courseLang, taughtLang, lastUpda, //
   );
+  console.log(`Inserted ${jpnSubjectName} [${engSubjectName}] for ${lang}`);
 }
 
 try {
