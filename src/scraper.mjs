@@ -511,7 +511,7 @@ try {
             console.log("This page has no result, skipping");
             continue;
           }
-          const dayPeriods = await Promise.allSettled((await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1).map(inner));
+          const dayPeriods = await Promise.all((await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1).map(inner));
 
           for (let i = 0; i < totalInPage; i++) {
             if (resuming) {
