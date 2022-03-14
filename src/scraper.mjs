@@ -519,7 +519,7 @@ try {
               // resume is completed
               resuming = false;
             }
-            console.log(`Clicking row ${i} (${i + 1}/${totalInPage})`);
+            console.log(`Clicking row ${i + 1} (out of ${totalInPage})`);
             await Promise.allSettled([
               itemsInPage[i].click(),
               waitNav(),
