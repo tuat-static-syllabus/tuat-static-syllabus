@@ -295,19 +295,25 @@ function waitNav() {
 
 async function click(tagId, wait = false) {
   // clicks button
-  await page.click(`input[name=${tagId}]`);
-  if (wait) await waitNav();
+  await Promise.allSettled([
+    page.click(`input[name=${tagId}]`),
+    wait ? waitNav() : Promise.resolve(),
+  ]);
 }
 
 async function dropdown(tagId, value, wait = false) {
   // only use when page refreshes if changed, else not needed
-  await page.select(`select[name=${tagId}]`, value);
-  if (wait) await waitNav();
+  await Promise.allSettled([
+    page.select(`select[name=${tagId}]`, value),
+    wait ? waitNav() : Promise.resolve(),
+  ]);
 }
 
 async function typeInput(tagId, value, wait = false) {
-  await page.type(`input[name=${tagId}]`, value);
-  if (wait) await waitNav();
+  await Promise.allSettled([
+    page.type(`input[name=${tagId}]`, value),
+    wait ? waitNav() : Promise.resolve(),
+  ]);
 }
 
 function init() {
