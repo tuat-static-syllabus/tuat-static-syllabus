@@ -509,7 +509,7 @@ try {
             console.log("This page has no result, skipping");
             continue;
           }
-          const dayPeriods = (await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1);
+          const dayPeriods = await Promise.allSettled((await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1).map(inner));
 
           for (let i = 0; i < totalInPage; i++) {
             if (resuming) {
@@ -521,12 +521,12 @@ try {
             await Promise.allSettled([
               itemsInPage[i].click(),
               waitNav(),
-              !resuming ? await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i) : Promise.resolve(),
+              !resuming ? writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i) : Promise.resolve(),
             ]);
             await sleep(100);
 
             // scrape the page and put it into database
-            await processPage(syllabusLanguage, year, faculty, await inner(dayPeriods[i]));
+            await processPage(syllabusLanguage, year, faculty, dayPeriods[i]);
 
             // go back to previous list page
             if (!useBack) {
