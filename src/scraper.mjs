@@ -469,8 +469,10 @@ try {
                 console.log(`Updating known maximum: ${knownMax} => ${mk}`);
                 knownMax = mk;
               }
-              await pages[exLink].click();
-              await waitNav();
+              await Promise.allSettled([
+                pages[exLink].click(),
+                waitNav(),
+              ]);
             } else {
               break;
             }
