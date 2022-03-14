@@ -509,7 +509,7 @@ try {
           const totalInPage = itemsInPage.length;
           if (totalInPage == 0) {
             console.log("This page has no result, skipping");
-            continue;
+            break;
           }
           const dayPeriods = await Promise.all((await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1).map(inner));
 
