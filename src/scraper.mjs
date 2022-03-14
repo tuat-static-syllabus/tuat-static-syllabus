@@ -518,10 +518,11 @@ try {
               resuming = false;
             }
             console.log(`Clicking row ${i}`);
-            if (!resuming)
-              await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i);
-            await itemsInPage[i].click();
-            await waitNav();
+            await Promise.allSettled([
+              itemsInPage[i].click(),
+              waitNav(),
+              !resuming ? await writeResumeInfo(syllabusLanguage, year.value, faculty.value, currentPage, i) : Promise.resolve(),
+            ]);
             await sleep(100);
 
             // scrape the page and put it into database
