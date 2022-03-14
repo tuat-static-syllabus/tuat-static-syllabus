@@ -503,7 +503,7 @@ try {
 
         do {
           await reopenPage();
-          console.log(`Now at page ${currentPage}`);
+          console.log(`Now at page ${currentPage} (out of ~${knownMax})`);
           // iterate through 詳細 buttons, in weird way!
           let itemsInPage = await page.$$("input[type=submit][value=詳細]");
           const totalInPage = itemsInPage.length;
@@ -519,7 +519,7 @@ try {
               // resume is completed
               resuming = false;
             }
-            console.log(`Clicking row ${i}`);
+            console.log(`Clicking row ${i} (${i}/${totalInPage})`);
             await Promise.allSettled([
               itemsInPage[i].click(),
               waitNav(),
