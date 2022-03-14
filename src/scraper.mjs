@@ -90,7 +90,9 @@ const db = await open({
            course_description TEXT, expected_learning TEXT, course_schedule TEXT, prerequisites TEXT,
            texts_and_materials TEXT, _references TEXT, assessment TEXT, message_from_instructor TEXT,
            course_keywords TEXT, office_hours TEXT, remarks_1 TEXT, remarks_2 TEXT, related_url TEXT,
-           course_language TEXT, taught_language TEXT, last_update TEXT
+           course_language TEXT, taught_language TEXT, last_update TEXT,
+
+           day_period_id INTEGER
       );
 
       CREATE TABLE present_lang_table (id INTEGER PRIMARY KEY AUTOINCREMENT, lang_name TEXT, lang_code TEXT);
@@ -105,6 +107,7 @@ const db = await open({
       CREATE TABLE course_type_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
       CREATE TABLE facility_affiliation_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
       CREATE TABLE office_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
+      CREATE TABLE day_period_table (id INTEGER PRIMARY KEY AUTOINCREMENT, ja TEXT, en TEXT);
 
       CREATE TABLE resume_info (id INTEGER PRIMARY KEY, lang TEXT, year TEXT, faculty TEXT, page INTEGER, row INTEGER);
     `);
@@ -173,6 +176,16 @@ const db = await open({
     for (let i = 0; i <= 4; i++) {
       // start from 0 as there is a subject without range (応用化学セミナーⅡ)
       await db.run("INSERT INTO grades_table(min, max) VALUES (?,?)", i, 0);
+    }
+
+    await db.run("INSERT INTO day_period_table(ja, en) VALUES (?,?)", "", "");
+    await db.run("INSERT INTO day_period_table(ja, en) VALUES (?,?)", "集中", "Intensive");
+    const jpnDates = [..."月火水木金"];
+    const engDates = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    for (let time = 1; time <= 6; time++) {
+      for (let date = 0; date < 7; date++) {
+        await db.run("INSERT INTO day_period_table(ja, en) VALUES (?,?)", `${jpnDates[date]}${time}`, `${engDates[date]}.${time}`);
+      }
     }
   }
 }
@@ -305,7 +318,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function processPage(lang, year, faculty) {
+async function processPage(lang, year, faculty, dayPeriod) {
   // for subject name and instructor, both JPN and ENG exist in the page
   // except them requires to be extracted individually
   // mispelling of the following variables are made intentional
@@ -356,10 +369,11 @@ async function processPage(lang, year, faculty) {
   const instructorId = await queryBilingual("instructor", jpnInstr, engInstr);
   const facilityAffiliationId = await getItemId("facility_affiliation", idNoLang, lang, affili);
   const officeId = await getItemId("office", idNoLang, lang, office);
+  const dayPeriodId = await getItemId("day_period", idNoLang, lang, dayPeriod);
 
   // let's insert
   await db.run( //
-    `INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
+    `INSERT OR REPLACE INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, //
     `${idNoLang}-${lang}`, nameId, +year.value, pLangId, //
     neutralDepId, categoryId, //
     requiem, credits, departmentId, gradesId, //
@@ -370,6 +384,8 @@ async function processPage(lang, year, faculty) {
     tekst, refer, ases, instrMessage, //
     kewada, ofiseHours, remarks1, remarks2, relaURL, //
     courseLang, taughtLang, lastUpda, //
+
+    dayPeriodId,
   );
   console.log(`Inserted ${jpnSubjectName} [${engSubjectName}] for ${lang}`);
 }
@@ -482,10 +498,12 @@ try {
           // iterate through 詳細 buttons, in weird way!
           let itemsInPage = await page.$$("input[type=submit][value=詳細]");
           const totalInPage = itemsInPage.length;
-          if(totalInPage == 0){
+          if (totalInPage == 0) {
             console.log("This page has no result, skipping");
             continue;
           }
+          const dayPeriods = (await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1);
+
           for (let i = 0; i < totalInPage; i++) {
             if (resuming) {
               i = +_row;
@@ -500,7 +518,7 @@ try {
             await sleep(100);
 
             // scrape the page and put it into database
-            await processPage(syllabusLanguage, year, faculty);
+            await processPage(syllabusLanguage, year, faculty, await inner(dayPeriods[i]));
 
             // go back to previous list page
             if (!useBack) {
@@ -521,8 +539,14 @@ try {
           }
 
           // get maximum number of pages
+          let hasMore = false;
           for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
-            const num = parseInt((await inner(pageElem)).trim());
+            const linkText = (await inner(pageElem)).trim();
+            if (linkText == "...") {
+              hasMore = true;
+              continue;
+            }
+            const num = parseInt(linkText) + !!hasMore;
             // failed to parse (次へ or ...)
             if (num !== num) continue;
             // we're already on last page
