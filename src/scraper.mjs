@@ -10,8 +10,6 @@ const browser = await puppeteer.launch({
 });
 const page = await browser.newPage();
 page.setDefaultNavigationTimeout(10000);
-// DO NOT TURN THIS TO TRUE; or chromium break with ERR_CACHE_MISS error which can't be countered
-const useBack = false;
 
 page.on("requestfailed", async (request) => {
   console.log(`url: ${request.url()}, errText: ${request.failure().errorText}, method: ${request.method()}`);
@@ -259,8 +257,8 @@ async function lookupNeutralDep(value) {
   return (await db.get("SELECT id FROM neutral_department_table WHERE ja = ? OR en = ?", value, value)).id;
 }
 
-async function writeResumeInfo(lang, year, faculty, page, row) {
-  await db.run("INSERT INTO resume_info(lang, year, faculty, page, row) VALUES (?,?,?,?,?)", lang, year, faculty, page, row);
+async function writeResumeInfo(lang, year, faculty, pageNum, row) {
+  await db.run("INSERT INTO resume_info(lang, year, faculty, page, row) VALUES (?,?,?,?,?)", lang, year, faculty, pageNum, row);
 }
 
 async function readResumeInfo() {
@@ -268,6 +266,7 @@ async function readResumeInfo() {
   if (!resp) {
     return [false, null, null, null, null, null];
   }
+  // eslint-disable-next-line no-shadow
   const { lang, year, faculty, page, row } = resp;
   return [true, lang, year, faculty, page, row];
 }
@@ -501,12 +500,35 @@ try {
           }
         }
 
+        // eslint-disable-next-line no-inner-declarations
+        async function estimatePageNumber() {
+          // get maximum number of pages
+          let hasMore = false;
+          for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
+            const linkText = (await inner(pageElem)).trim();
+            if (linkText === "...") {
+              hasMore = true;
+              continue;
+            }
+            const num = parseInt(linkText) + !!hasMore;
+            // failed to parse (次へ or ...)
+            if (num !== num) continue;
+            // we're already on last page
+            if (num <= knownMax) break;
+            if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+
+            knownMax = num;
+            break;
+          }
+        }
+
         do {
           await reopenPage();
           console.log(`Now at page ${currentPage} (out of ~${knownMax})`);
           // iterate through 詳細 buttons, in weird way!
           let itemsInPage = await page.$$("input[type=submit][value=詳細]");
           const totalInPage = itemsInPage.length;
+          // eslint-disable-next-line eqeqeq
           if (totalInPage == 0) {
             console.log("This page has no result, skipping");
             break;
@@ -531,12 +553,9 @@ try {
             await processPage(syllabusLanguage, year, faculty, dayPeriods[i]);
 
             // go back to previous list page
-            if (!useBack) {
-              await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
-              await reopenPage();
-            } else {
-              await page.goBack();
-            }
+            await page.goto("https://spica.gakumu.tuat.ac.jp/syllabus/SearchList.aspx");
+            await reopenPage();
+
             // grab handle again...
             // eslint-disable-next-line no-constant-condition
             while (true) {
@@ -548,24 +567,7 @@ try {
             }
           }
 
-          // get maximum number of pages
-          let hasMore = false;
-          for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
-            const linkText = (await inner(pageElem)).trim();
-            if (linkText == "...") {
-              hasMore = true;
-              continue;
-            }
-            const num = parseInt(linkText) + !!hasMore;
-            // failed to parse (次へ or ...)
-            if (num !== num) continue;
-            // we're already on last page
-            if (num <= knownMax) break;
-            if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
-
-            knownMax = num;
-            break;
-          }
+          await estimatePageNumber();
           currentPage++;
         } while (currentPage <= knownMax);
 
