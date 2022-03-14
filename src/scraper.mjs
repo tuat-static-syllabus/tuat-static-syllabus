@@ -26,7 +26,9 @@ function inner(ee) {
   return page.evaluate((at) => at.innerText, ee);
 }
 async function innerByQuery(q) {
-  return await inner(await page.$(q));
+  const el = await page.$(q);
+  if (!el) return null;
+  return await inner(el);
 }
 
 // open the database
@@ -108,7 +110,7 @@ const db = await open({
     `);
     // add some data that are already known in tables
     await db.run(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "日本語", "ja");
-    await db.run(`INSERT INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "English", "en");
+    await db.run(`INSERT OR REPLACE INTO present_lang_table(lang_name, lang_code) VALUES (?,?)`, "English", "en");
 
     const japaneseDeps = [
       "農学部",
@@ -127,6 +129,7 @@ const db = await open({
       "グローバル教育院",
       "資格科目",
       "教職科目",
+      "リーディングプログラム",
       "グローバル・プロフェッショナルプログラム",
       "卓越大学院プログラム",
     ];
@@ -147,6 +150,7 @@ const db = await open({
       "Organization for the Advancement of Education and Global Learning",
       "License Course",
       "Teaching Course",
+      "LEADING PROGRAM",
       "GLOBAL PROFESSIONAL PROGRAM",
       "WISE PROGRAM",
     ];
@@ -215,6 +219,8 @@ async function queryBilingual(table, ja, en) {
     result = (await dbGet(`SELECT id FROM ${table}_table WHERE ja = ?`, ja)).id;
   } else if (!ja && en) {
     result = (await dbGet(`SELECT id FROM ${table}_table WHERE en = ?`, en)).id;
+  } else {
+    result = (await dbGet(`SELECT id FROM ${table}_table WHERE ja = ? AND en = ?`, "", "")).id;
   }
   if (result !== undefined) {
     return result;
