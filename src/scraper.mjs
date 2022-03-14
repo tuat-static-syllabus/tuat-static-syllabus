@@ -420,7 +420,10 @@ try {
           // check current page number
           {
             const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
-            if (displayingPage === `${currentPage}`) {
+            if (displayingPage === null) {
+              console.log("This page is empty. (No search results?)");
+              return;
+            } else if (displayingPage === `${currentPage}`) {
               return;
             }
           }
@@ -479,6 +482,10 @@ try {
           // iterate through 詳細 buttons, in weird way!
           let itemsInPage = await page.$$("input[type=submit][value=詳細]");
           const totalInPage = itemsInPage.length;
+          if(totalInPage == 0){
+            console.log("This page has no result, skipping");
+            continue;
+          }
           for (let i = 0; i < totalInPage; i++) {
             if (resuming) {
               i = +_row;
