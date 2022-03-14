@@ -9,6 +9,7 @@ const browser = await puppeteer.launch({
   args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
+page.setDefaultNavigationTimeout(10000);
 // DO NOT TURN THIS TO TRUE; or chromium break with ERR_CACHE_MISS error which can't be countered
 const useBack = false;
 
