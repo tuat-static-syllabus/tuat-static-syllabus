@@ -215,10 +215,12 @@ async function getItemId(table, idWoLang, inLang, inText) {
   const response = (await dbGet(`SELECT ${table}_id FROM subjects WHERE id = ?`, `${idWoLang}-${oppositeLang}`))[`${table}_id`];
   if (response === undefined) {
     // no such subject; insert with another language missing
+    // console.log(`Insert: ${table} ${inLang} ${response}`);
     return (await db.run(`INSERT INTO ${table}_table(${inLang}) VALUES (?)`, inText)).lastID;
   } else {
     // update record to complement data
-    await db.exec(`UPDATE ${table}_table SET ${inLang} = ? WHERE id = ?`, inText, response);
+    // console.log(`Fill: ${table} ${inLang} ${typeof response} ${response}`);
+    await db.run(`UPDATE ${table}_table SET ${inLang} = ? WHERE id = ?`, inText, response);
     return response;
   }
 }
