@@ -5,7 +5,7 @@ import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
 const browser = await puppeteer.launch({
-  // headless: false,
+  headless: false,
   args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
@@ -295,7 +295,7 @@ function waitNav() {
 async function click(tagId, wait = false) {
   // clicks button
   await Promise.allSettled([
-    page.click(`input[name=${tagId}]`),
+    page.click(`input#${tagId}`),
     wait ? waitNav() : Promise.resolve(),
   ]);
 }
@@ -303,16 +303,29 @@ async function click(tagId, wait = false) {
 async function dropdown(tagId, value, wait = false) {
   // only use when page refreshes if changed, else not needed
   await Promise.allSettled([
-    page.select(`select[name=${tagId}]`, value),
+    page.select(`select#${tagId}`, value),
     wait ? waitNav() : Promise.resolve(),
   ]);
 }
 
 async function typeInput(tagId, value, wait = false) {
   await Promise.allSettled([
-    page.type(`input[name=${tagId}]`, value),
+    page.type(`input#${tagId}`, value),
     wait ? waitNav() : Promise.resolve(),
   ]);
+}
+
+function searchDetailsButtons(){
+  return page.$$("input[type=submit][value=詳細],input[type=submit][value=Details]");
+}
+
+async function switchEN(){
+  if(await innerByQuery("span#lblYear")=="Choose academic year"){
+    // already English
+    return;
+  }
+  console.log("Switching language");
+  await click("SelectLanguage1_imgJE", true);
 }
 
 function init() {
@@ -405,7 +418,7 @@ try {
   if (resuming) {
     console.log(`Resuming from: ${_lang}, ${_year}, ${_faculty}, ${_page}, ${_row}`)
   }
-  for (const syllabusLanguage of ["ja",]) {
+  for (const syllabusLanguage of ["ja", "en"]) {
     if (resuming && syllabusLanguage !== _lang)
       continue;
 
@@ -413,6 +426,9 @@ try {
       if (resuming && year.value !== _year)
         continue;
 
+      if (syllabusLanguage === "en") {
+        await switchEN();
+      }
       await dropdown("ddl_year", year.value, true);
       const yearSelectedDDs = await findDropdowns();
 
@@ -421,8 +437,7 @@ try {
           continue;
 
         if (syllabusLanguage === "en") {
-          console.log("Switching language");
-          await click("SelectLanguage1_imgJE", true);
+          await switchEN();
         }
         console.log(`Selecting ${year.name} and ${faculty.name}`);
         await dropdown("ddl_year", year.value, true);
@@ -526,11 +541,12 @@ try {
           await reopenPage();
           console.log(`Now at page ${currentPage} (out of ~${knownMax})`);
           // iterate through 詳細 buttons, in weird way!
-          let itemsInPage = await page.$$("input[type=submit][value=詳細]");
+          let itemsInPage = await searchDetailsButtons();
           const totalInPage = itemsInPage.length;
           // eslint-disable-next-line eqeqeq
           if (totalInPage == 0) {
             console.log("This page has no result, skipping");
+            await sleep(100000000);
             break;
           }
           const dayPeriods = await Promise.all((await page.$$("table#rdlGrid_gridList td:nth-child(7n+5)")).slice(1).map(inner));
@@ -559,7 +575,7 @@ try {
             // grab handle again...
             // eslint-disable-next-line no-constant-condition
             while (true) {
-              itemsInPage = await page.$$("input[type=submit][value=詳細]");
+              itemsInPage = await searchDetailsButtons();
               if (itemsInPage.length === totalInPage) break;
 
               await sleep(10);
