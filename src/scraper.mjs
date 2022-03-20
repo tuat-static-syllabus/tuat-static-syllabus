@@ -5,7 +5,7 @@ import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
 const browser = await puppeteer.launch({
-  headless: false,
+  // headless: false,
   args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
