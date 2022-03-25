@@ -7,6 +7,8 @@ import { open } from "sqlite";
 const db = await open({
   filename: "./syllabus.sqlite",
   driver: sqlite3.Database,
+  // open DB in R/O to ensure safety
+  mode: sqlite3.OPEN_READONLY,
 });
 {
   const old = db.get;
