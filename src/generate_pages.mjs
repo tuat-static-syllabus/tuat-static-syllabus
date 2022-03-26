@@ -57,7 +57,7 @@ function betterEach() {
       }
       rows.push(row);
     }).then(rowsCount => {
-      if (rowsCount != rows.length) {
+      if (rowsCount !== rows.length) {
         return reject(new Error(`rowsCount (${rowsCount}) != rows.length (${rows.length})`));
       }
       resolve(rows)
@@ -69,10 +69,14 @@ async function countRows(table, filter = "", params = []) {
   return (await db.get(`SELECT COUNT(*) FROM ${table} ${filter};`), params)['COUNT(*)'];
 }
 
-async function* enumerateRows(table, pageSize = 30, filter = "", params = []) {
+async function* enumerateRows(table, pageSize = 30, filter = "", params = [], expand = true) {
   const total = await countRows(table);
   for (let offset = 0; offset < total; offset += pageSize) {
-    yield* await betterEach(`SELECT * FROM ${table} ${filter} LIMIT ${pageSize} OFFSET ${offset};`, params);
+    if (expand) {
+      yield* await betterEach(`SELECT * FROM ${table} ${filter} LIMIT ${pageSize} OFFSET ${offset};`, params);
+    } else {
+      yield await betterEach(`SELECT * FROM ${table} ${filter} LIMIT ${pageSize} OFFSET ${offset};`, params);
+    }
   }
 }
 
@@ -142,22 +146,59 @@ for await (const row of enumerateRows("subjects")) {
 }
 
 
-async function generatePages(pageDest, filter, params) {
-
+async function generatePages(pageDest, lang, visibleFilters, filter, params) {
+  const pageSize = 50;
+  const rowCount = await countRows("subjects", filter, params);
+  const pageCount = Math.ceil(rowCount / pageSize);
+  const filters = [];
+  let pageNum = 1;
+  for await (const page of enumerateRows("subjects", pageSize, filter, params, false)) {
+    const content = {
+      pages: {
+        now: pageNum,
+        maximum: pageCount === pageNum,
+        indices: [],
+      },
+      filters,
+      subjects: [],
+    };
+    await publish(
+      `${pageDest}/page${printf("%02d", pageNum)}.html`,
+      lang, "subject_list", content);
+    pageNum++;
+  }
 }
 
 // generate subject list page, with some filters
 for await (const lang of enumerateRows("present_lang_table")) {
   // filter by: language
-  await generatePages("pageDest", "WHERE present_lang_id = ?", [lang.id]);
+  await generatePages(
+    `${lang.lang_code}`, lang.lang_code,
+    [
+      { key: "present_lang", value: lang.lang_name },
+    ],
+    "WHERE present_lang_id = ?", [lang.id]);
 
   for (const acYear of years) {
     // filter by: language, year
-    await generatePages("pageDest", "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]);
+    await generatePages(
+      `${lang.lang_code}/${acYear}`, lang.lang_code,
+      [
+        { key: "present_lang", value: lang.lang_name },
+        { key: "year", value: acYear },
+      ],
+      "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]);
 
     for await (const faculty of enumerateRows("neutral_department_table")) {
       // filter by: language, year, faculty
-      await generatePages("pageDest", "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]);
+      await generatePages(
+        `${lang.lang_code}/${acYear}/${printf("%02d", faculty.id)}`, lang.lang_code,
+        [
+          { key: "present_lang", value: lang.lang_name },
+          { key: "year", value: acYear },
+          { key: "faculty", value: faculty[lang.lang_code] },
+        ],
+        "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]);
     }
   }
 }
