@@ -91,6 +91,10 @@
       "filter_faculty": "Faculty offering the course"
     }
   },
+  "listings": {
+    "ja": {},
+    "en": {}
+  },
   "__": {
     "ja": {
       "details_title": "授業詳細",
@@ -99,7 +103,8 @@
       "filter_name_year": "開講年度",
       "filter_name_faculty": "開講学部",
       "select_year": "開講年度を選択",
-      "select_faculty": "開講学部を選択"
+      "select_faculty": "開講学部を選択",
+      "proceed_filtering": "ここまでの選択だけで絞り込む"
     },
     "en": {
       "details_title": "Course details",
@@ -108,7 +113,8 @@
       "filter_name_year": "Academic year",
       "filter_name_faculty": "Faculty offering the course",
       "select_year": "Select academic year",
-      "select_faculty": "Select faculty, offering the course"
+      "select_faculty": "Select faculty, offering the course",
+      "proceed_filtering": "Proceed with the current filters"
     }
   }
 }

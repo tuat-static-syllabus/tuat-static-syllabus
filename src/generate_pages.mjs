@@ -231,12 +231,18 @@ for await (const lang of enumerateRows("present_lang_table")) {
     }
 
     await publish(`${lang.lang_code}/${acYear}/index.html`, lang.lang_code, "listings", {
-      items: facultySelection,
+      items: [
+        ...facultySelection,
+      {href:"./page001.html",value: pageLangs.__[lang.lang_code].proceed_filtering},
+      ],
     }, { __title: pageLangs.__[lang.lang_code].select_faculty });
   }
 
   await publish(`${lang.lang_code}/index.html`, lang.lang_code, "listings", {
-    items: yearSelection,
+    items: [
+      ...yearSelection,
+      {href:"./page001.html",value: pageLangs.__[lang.lang_code].proceed_filtering},
+    ],
   }, { __title: pageLangs.__[lang.lang_code].select_year });
 }
 
