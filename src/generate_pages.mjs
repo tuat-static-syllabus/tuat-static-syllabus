@@ -59,7 +59,7 @@ function betterEach() {
       if (rowsCount != rows.length) {
         return reject(new Error(`rowsCount (${rowsCount}) != rows.length (${rows.length})`));
       }
-      resolve({ rowsCount, rows })
+      resolve(rows)
     }, reject);
   });
 }
@@ -71,8 +71,7 @@ async function countRows(table) {
 async function* enumerateRows(table, pageSize = 30) {
   const total = await countRows(table);
   for (let offset = 0; offset < total; offset += pageSize) {
-    const { rows } = await betterEach(`SELECT * FROM ${table} LIMIT ${pageSize} OFFSET ${offset};`);
-    yield* rows;
+    yield* await betterEach(`SELECT * FROM ${table} LIMIT ${pageSize} OFFSET ${offset};`);
   }
 }
 
@@ -109,7 +108,7 @@ async function publish(dest, lang, layout, contents) {
 ${JSON.stringify({
     title: pageLangs.__[lang][`${layout}_title`],
     layout,
-    texts: pageLangs[layout],
+    texts: pageLangs[layout][lang],
     contents,
   })}
 ---`;
@@ -124,6 +123,8 @@ for await (const row of enumerateRows("subjects")) {
   // _references -> references
   row.references = row._references;
   delete row._references;
+  // surprisingly (and luckily in this time), Jekyll emits empty for 0 number literal.
+  // so there won't be sanitization for grades key. ("| textilize" is needed to show 0 instead)
 
   console.log(`Generating ${row.name.ja} for ${row.present_lang.lang_code}`);
   await publish(
@@ -131,5 +132,6 @@ for await (const row of enumerateRows("subjects")) {
     row.present_lang.lang_code,
     "syllabus_details",
     row);
-  // break;
+
+  break;
 }
