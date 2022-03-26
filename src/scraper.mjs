@@ -182,7 +182,7 @@ const db = await open({
     const jpnDates = [..."月火水木金"];
     const engDates = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     for (let time = 1; time <= 6; time++) {
-      for (let date = 0; date < 7; date++) {
+      for (let date = 0; date < 6; date++) {
         await db.run("INSERT INTO day_period_table(ja, en) VALUES (?,?)", `${jpnDates[date]}${time}`, `${engDates[date]}.${time}`);
       }
     }
