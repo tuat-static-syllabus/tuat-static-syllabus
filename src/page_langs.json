@@ -92,7 +92,13 @@
     }
   },
   "__": {
-    "ja": {},
-    "en": {}
+    "ja": {
+      "details_title": "授業詳細",
+      "subject_list_title": "授業一覧"
+    },
+    "en": {
+      "details_title": "Course details",
+      "subject_list_title": "Course list"
+    }
   }
 }

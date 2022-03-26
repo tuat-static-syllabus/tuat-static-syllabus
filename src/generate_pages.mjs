@@ -3,7 +3,10 @@
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import fs from "fs";
+import path from "path";
 import util from "util";
+
+import pageLangs from "./page_langs.json";
 
 // open the database
 const db = await open({
@@ -94,21 +97,39 @@ async function inlineMonolingual(obj, lang) {
       continue;
     }
     k = k.substring(0, k.length - 3);
-    console.log("proc", k);
     obj[k] = (await db.get(`SELECT ${lang} FROM ${k}_table WHERE id = ?;`, [obj[`${k}_id`]]))[lang];
     delete obj[`${k}_id`];
   }
   return obj;
 }
 
-await createDir("generated/");
+async function publish(dest, lang, layout, contents) {
+  await createDir(path.dirname(`generated/${dest}`));
+  const output = `---
+${JSON.stringify({
+    title: pageLangs.__[lang][`${layout}_title`],
+    layout,
+    texts: pageLangs[layout],
+    contents,
+  })}
+---`;
+  await util.promisify(fs.writeFile)(`generated/${dest}`, output);
+}
 
 console.log(await countRows("subjects"));
 for await (const row of enumerateRows("subjects")) {
-  // inline bilingual entries
-  // _references -> references
+  // inline entries
   await inlineVars(row, ["name", "instructor", "present_lang", "grades"]);
   await inlineMonolingual(row, "ja");
-  console.log(row);
-  break;
+  // _references -> references
+  row.references = row._references;
+  delete row._references;
+
+  console.log(`Generating ${row.name.ja} for ${row.present_lang.lang_code}`);
+  await publish(
+    `${row.present_lang.lang_code}/${row.year}/${row.course_code}.html`,
+    row.present_lang.lang_code,
+    "syllabus_details",
+    row);
+  // break;
 }

@@ -105,3 +105,6 @@ dist
 
 # sqlite
 *.sqlite
+
+# generated files by script
+generated/
