@@ -5,6 +5,7 @@ import { open } from "sqlite";
 import fs from "fs";
 import path from "path";
 import util from "util";
+import printf from "printf";
 
 import pageLangs from "./page_langs.json";
 
@@ -64,14 +65,14 @@ function betterEach() {
   });
 }
 
-async function countRows(table) {
-  return (await db.get(`SELECT COUNT(*) FROM ${table};`))['COUNT(*)'];
+async function countRows(table, filter = "", params = []) {
+  return (await db.get(`SELECT COUNT(*) FROM ${table} ${filter};`), params)['COUNT(*)'];
 }
 
-async function* enumerateRows(table, pageSize = 30) {
+async function* enumerateRows(table, pageSize = 30, filter = "", params = []) {
   const total = await countRows(table);
   for (let offset = 0; offset < total; offset += pageSize) {
-    yield* await betterEach(`SELECT * FROM ${table} LIMIT ${pageSize} OFFSET ${offset};`);
+    yield* await betterEach(`SELECT * FROM ${table} ${filter} LIMIT ${pageSize} OFFSET ${offset};`, params);
   }
 }
 
@@ -115,8 +116,11 @@ ${JSON.stringify({
   await util.promisify(fs.writeFile)(`generated/${dest}`, output);
 }
 
+// generate subjects pages
+const years = new Set();
 console.log(await countRows("subjects"));
 for await (const row of enumerateRows("subjects")) {
+  const nDepId = row.neutral_department_id;
   // inline entries
   await inlineVars(row, ["name", "instructor", "present_lang", "grades"]);
   await inlineMonolingual(row, "ja");
@@ -128,10 +132,32 @@ for await (const row of enumerateRows("subjects")) {
 
   console.log(`Generating ${row.name.ja} for ${row.present_lang.lang_code}`);
   await publish(
-    `${row.present_lang.lang_code}/${row.year}/${row.course_code}.html`,
+    `${row.present_lang.lang_code}/${row.year}/${printf("%02d", nDepId)}/${row.course_code}.html`,
     row.present_lang.lang_code,
     "syllabus_details",
     row);
 
+  years.add(row.year);
   break;
+}
+
+
+async function generatePages(pageDest, filter, params) {
+
+}
+
+// generate subject list page, with some filters
+for await (const lang of enumerateRows("present_lang_table")) {
+  // filter by: language
+  await generatePages("pageDest", "WHERE present_lang_id = ?", [lang.id]);
+
+  for (const acYear of years) {
+    // filter by: language, year
+    await generatePages("pageDest", "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]);
+
+    for await (const faculty of enumerateRows("neutral_department_table")) {
+      // filter by: language, year, faculty
+      await generatePages("pageDest", "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]);
+    }
+  }
 }
