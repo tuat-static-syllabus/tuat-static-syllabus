@@ -66,11 +66,11 @@ function betterEach() {
 }
 
 async function countRows(table, filter = "", params = []) {
-  return (await db.get(`SELECT COUNT(*) FROM ${table} ${filter};`), params)['COUNT(*)'];
+  return (await db.get(`SELECT COUNT(*) FROM ${table} ${filter};`, params))['COUNT(*)'];
 }
 
 async function* enumerateRows(table, pageSize = 30, filter = "", params = [], expand = true) {
-  const total = await countRows(table);
+  const total = await countRows(table, filter, params);
   for (let offset = 0; offset < total; offset += pageSize) {
     if (expand) {
       yield* await betterEach(`SELECT * FROM ${table} ${filter} LIMIT ${pageSize} OFFSET ${offset};`, params);
@@ -107,13 +107,13 @@ async function inlineMonolingual(obj, lang) {
   return obj;
 }
 
-async function publish(dest, lang, layout, contents) {
+async function publish(dest, lang, layout, contents, textOverride = {}) {
   await createDir(path.dirname(`generated/${dest}`));
   const output = `---
 ${JSON.stringify({
-    title: pageLangs.__[lang][`${layout}_title`],
+    title: pageLangs.__[lang][`${layout}_title`] || textOverride.__title,
     layout,
-    texts: pageLangs[layout][lang],
+    texts: Object.assign({}, pageLangs[layout][lang], textOverride),
     contents,
   })}
 ---`;
@@ -134,7 +134,7 @@ for await (const row of enumerateRows("subjects")) {
   // surprisingly (and luckily in this time), Jekyll emits empty for 0 number literal.
   // so there won't be sanitization for grades key. ("| textilize" is needed to show 0 instead)
 
-  console.log(`Generating ${row.name.ja} for ${row.present_lang.lang_code}`);
+  console.log(`Generating ${row.name[row.present_lang.lang_code]} (${row.present_lang.lang_code})`);
   await publish(
     `${row.present_lang.lang_code}/${row.year}/${printf("%02d", nDepId)}/${row.course_code}.html`,
     row.present_lang.lang_code,
@@ -142,33 +142,49 @@ for await (const row of enumerateRows("subjects")) {
     row);
 
   years.add(row.year);
-  break;
+}
+console.log(years);
+
+function range(start, end) {
+  return Array(end - start).fill().map((e, i) => start + i);
 }
 
-
 async function generatePages(pageDest, lang, visibleFilters, filter, params) {
+  console.log("Generating subject list for", lang, visibleFilters);
   const pageSize = 50;
   const rowCount = await countRows("subjects", filter, params);
   const pageCount = Math.ceil(rowCount / pageSize);
   const filters = [];
+  for (const { key, value } in visibleFilters) {
+    filters.push({ title: pageLangs.__[lang][`filter_name_${key}` || key, value] });
+  }
   let pageNum = 1;
   for await (const page of enumerateRows("subjects", pageSize, filter, params, false)) {
     const content = {
       pages: {
         now: pageNum,
         maximum: pageCount === pageNum,
-        indices: [],
+        // TODO: want to use logarithm paging
+        indices: range(Math.max(1, pageNum - 6), Math.min(pageCount, pageNum + 6)),
       },
+      total: rowCount,
       filters,
       subjects: [],
     };
+    // index is for selecting, not here
+    // if (pageNum === 1) {
+    //   await publish(`${pageDest}/index.html`, lang, "subject_list", content);
+    // }
     await publish(
-      `${pageDest}/page${printf("%02d", pageNum)}.html`,
+      `${pageDest}/page${printf("%03d", pageNum)}.html`,
       lang, "subject_list", content);
     pageNum++;
   }
+  console.log(`${pageNum} pages generated.`);
 }
 
+
+const langSelection = [];
 // generate subject list page, with some filters
 for await (const lang of enumerateRows("present_lang_table")) {
   // filter by: language
@@ -179,7 +195,15 @@ for await (const lang of enumerateRows("present_lang_table")) {
     ],
     "WHERE present_lang_id = ?", [lang.id]);
 
+  langSelection.push({
+    href: `${lang.lang_code}/`, value: lang.lang_name
+  });
+
+  const yearSelection = [];
   for (const acYear of years) {
+    yearSelection.push({
+      href: `${lang.lang_code}/${acYear}/`, value: acYear
+    });
     // filter by: language, year
     await generatePages(
       `${lang.lang_code}/${acYear}`, lang.lang_code,
@@ -189,7 +213,12 @@ for await (const lang of enumerateRows("present_lang_table")) {
       ],
       "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]);
 
+    const facultySelection = [];
     for await (const faculty of enumerateRows("neutral_department_table")) {
+      facultySelection.push({
+        href: `${lang.lang_code}/${acYear}/${printf("%02d", faculty.id)}/page001.html`,
+        value: faculty[lang.lang_code]
+      });
       // filter by: language, year, faculty
       await generatePages(
         `${lang.lang_code}/${acYear}/${printf("%02d", faculty.id)}`, lang.lang_code,
@@ -200,5 +229,22 @@ for await (const lang of enumerateRows("present_lang_table")) {
         ],
         "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]);
     }
+
+    await publish(`${lang.lang_code}/${acYear}/index.html`, lang.lang_code, "listings", {
+      items: facultySelection,
+    }, { __title: pageLangs.__[lang.lang_code].select_faculty });
   }
+
+  await publish(`${lang.lang_code}/index.html`, lang.lang_code, "listings", {
+    items: yearSelection,
+  }, { __title: pageLangs.__[lang.lang_code].select_year });
 }
+
+await publish("index.html", "ja", "listings", {
+  items: [
+    { href: "", value: "Select a language to display syllabus:" },
+    ...langSelection,
+  ]
+}, {
+  __title: "TUAT Static Syllabusへようこぞ / Welcome to TUAT Static Syllabus",
+});

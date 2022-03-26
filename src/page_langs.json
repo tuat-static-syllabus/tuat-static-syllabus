@@ -66,7 +66,7 @@
   "subject_list": {
     "ja": {
       "filters": "フィルタ:",
-      "results": "結果一覧",
+      "results": "結果一覧 (%TOTAL%件)",
       "semester": "開講期",
       "title": "科目名",
       "instructor": "担当教員",
@@ -79,7 +79,7 @@
     },
     "en": {
       "filters": "Filters:",
-      "results": "Results",
+      "results": "Results (%TOTAL% items total)",
       "semester": "Semester",
       "title": "Course title",
       "instructor": "Instructor(s)",
@@ -94,11 +94,21 @@
   "__": {
     "ja": {
       "details_title": "授業詳細",
-      "subject_list_title": "授業一覧"
+      "subject_list_title": "授業一覧",
+      "filter_name_present_lang": "表示言語",
+      "filter_name_year": "開講年度",
+      "filter_name_faculty": "開講学部",
+      "select_year": "開講年度を選択",
+      "select_faculty": "開講学部を選択"
     },
     "en": {
       "details_title": "Course details",
-      "subject_list_title": "Course list"
+      "subject_list_title": "Course list",
+      "filter_name_present_lang": "Display language",
+      "filter_name_year": "Academic year",
+      "filter_name_faculty": "Faculty offering the course",
+      "select_year": "Select academic year",
+      "select_faculty": "Select faculty, offering the course"
     }
   }
 }
