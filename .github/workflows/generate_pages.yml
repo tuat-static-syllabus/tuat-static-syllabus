@@ -37,13 +37,16 @@ jobs:
       - name: Generate files
         run: ./build_pages.sh
       - name: Push files to github.io
-        uses: tuat-static-syllabus/github-action-push-to-another-repository@v1.4.1
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.GH_PAT }}
-        with:
-          source-directory: generated/
-          destination-github-username: tuat-static-syllabus
-          destination-repository-username: tuat-static-syllabus.github.io
+        run: |
+          git clone https://lesmiscore:${{ secrets.GH_PAT }}@github.com/tuat-static-syllabus/tuat-static-syllabus.github.io GHP
+          cd GHP
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          rm -rf generated/ || true
+          cp -r ../generated/ .
+          git add .
+          git commit -am"automatic: push generated files @ $(date +'%Y%m%d')"
+          git push
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
