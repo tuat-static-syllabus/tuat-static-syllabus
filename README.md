@@ -33,4 +33,4 @@ It can resume from where it was previously stopped, using a table to record its 
 ./build_pages.sh
 ```
 
-Pages are generated at `generated/` directory. You have to pass them to Jekyll [with the template here](https://github.com/Lesmiscore/tuat-static-syllabus-template).
+Pages are generated at `generated/` directory. You have to pass them to Jekyll [with the template here](https://github.com/tuat-static-syllabus/tuat-static-syllabus.github.io).
