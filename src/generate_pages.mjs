@@ -165,10 +165,13 @@ function range(start, end) {
   return Array(end - start + 1).fill().map((e, i) => start + i);
 }
 
-async function generatePages(pageDest, lang, visibleFilters, filter, params) {
+async function generateListPages(pageDest, lang, visibleFilters, filter, params) {
   console.log("Generating subject list for", lang, visibleFilters);
   const pageSize = 50;
   const rowCount = await countRows("subjects", filter, params);
+  if (!rowCount) {
+    return false;
+  }
   const pageCount = Math.ceil(rowCount / pageSize);
   const filters = [];
   for (const { key, value } of visibleFilters) {
@@ -208,7 +211,8 @@ async function generatePages(pageDest, lang, visibleFilters, filter, params) {
       lang, "subject_list", content);
     pageNum++;
   }
-  console.log(`${pageNum} pages generated.`);
+  console.log(`${pageNum - 1} pages generated.`);
+  return true;
 }
 
 
@@ -216,46 +220,48 @@ const langSelection = [];
 // generate subject list page, with some filters
 for await (const lang of enumerateRows("present_lang_table")) {
   // filter by: language
-  await generatePages(
+  if (await generateListPages(
     `${lang.lang_code}`, lang.lang_code,
     [
       { key: "present_lang", value: lang.lang_name },
     ],
-    "WHERE present_lang_id = ?", [lang.id]);
+    "WHERE present_lang_id = ?", [lang.id]))
 
-  langSelection.push({
-    href: `${lang.lang_code}/`, value: lang.lang_name
-  });
+    langSelection.push({
+      href: `${lang.lang_code}/`, value: lang.lang_name
+    });
 
   const yearSelection = [];
   for (const acYear of years) {
-    yearSelection.push({
-      href: `${acYear}/`, value: acYear
-    });
     // filter by: language, year
-    await generatePages(
+    if (await generateListPages(
       `${lang.lang_code}/${acYear}`, lang.lang_code,
       [
         { key: "present_lang", value: lang.lang_name },
         { key: "year", value: acYear },
       ],
-      "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]);
+      "WHERE present_lang_id = ? AND year = ?", [lang.id, acYear]))
+
+      yearSelection.push({
+        href: `${acYear}/`, value: acYear
+      });
 
     const facultySelection = [];
     for await (const faculty of enumerateRows("neutral_department_table")) {
-      facultySelection.push({
-        href: `${printf("%02d", faculty.id)}/page1.html`,
-        value: faculty[lang.lang_code]
-      });
       // filter by: language, year, faculty
-      await generatePages(
+      if (await generateListPages(
         `${lang.lang_code}/${acYear}/${printf("%02d", faculty.id)}`, lang.lang_code,
         [
           { key: "present_lang", value: lang.lang_name },
           { key: "year", value: acYear },
           { key: "faculty", value: faculty[lang.lang_code] },
         ],
-        "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]);
+        "WHERE present_lang_id = ? AND year = ? AND neutral_department_id = ?", [lang.id, acYear, faculty.id]))
+
+        facultySelection.push({
+          href: `${printf("%02d", faculty.id)}/page1.html`,
+          value: faculty[lang.lang_code]
+        });
     }
 
     await publish(`${lang.lang_code}/${acYear}/index.html`, lang.lang_code, "listings", {
