@@ -36,11 +36,6 @@ jobs:
         run: wget "${{ steps.search-db.outputs.result }}" -O syllabus.sqlite
       - name: Generate files
         run: ./build_pages.sh
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: generated
-          path: generated/
       - name: Push files to github.io
         uses: tuat-static-syllabus/github-action-push-to-another-repository@v1.4.1
         env:
@@ -49,3 +44,8 @@ jobs:
           source-directory: generated/
           destination-github-username: tuat-static-syllabus
           destination-repository-username: tuat-static-syllabus.github.io
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: generated
+          path: generated/
