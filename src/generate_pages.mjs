@@ -140,7 +140,7 @@ for await (const row of enumerateRows("subjects")) {
   const nDepId = row.neutral_department_id;
   // inline entries
   await inlineVars(row, ["name", "instructor", "present_lang", "grades"]);
-  await inlineMonolingual(row, "ja");
+  await inlineMonolingual(row, row.present_lang.lang_code);
   // _references -> references
   row.references = row._references;
   delete row._references;

@@ -46,7 +46,7 @@ jobs:
           cp -r ../generated/ .
           git add .
           git commit -am"automatic: push generated files @ $(date +'%Y%m%d')" || true
-          GIT_EDITOR=true git merge coding || git merge --abort
+          GIT_EDITOR=true git merge origin/coding || git merge --abort
           git push
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
