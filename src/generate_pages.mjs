@@ -107,11 +107,11 @@ async function inlineMonolingual(obj, lang) {
   return obj;
 }
 
-function sanitizeGrades(gr){
-  if(!gr.min){
+function sanitizeGrades(gr) {
+  if (!gr.min) {
     delete gr.min;
   }
-  if(!gr.max){
+  if (!gr.max) {
     delete gr.max;
   }
   return gr;

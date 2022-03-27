@@ -1,0 +1,51 @@
+name: Generate pages
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Nodejs
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install deps
+        run: npm i
+      - name: Fetch latest database
+        id: search-db
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            const release = await github.request('GET /repos/{owner}/{repo}/releases/latest', {
+              owner: 'tuat-static-syllabus',
+              repo: 'tuat-static-syllabus'
+            });
+            for (const {name, browser_download_url} of release.data.assets) {
+              if (name != "syllabus.sqlite"){
+                continue;
+              }
+              return browser_download_url;
+            }
+            throw new Error("File not found!");
+      - name: Download latest database
+        run: wget "${{ steps.search-db.outputs.result }}" -O syllabus.sqlite
+      - name: Generate files
+        run: ./build_pages.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: generated
+          path: generated/
+      - name: Push files to github.io
+        uses: tuat-static-syllabus/github-action-push-to-another-repository@v1.4.1
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.GH_PAT }}
+        with:
+          source-directory: generated/
+          destination-github-username: tuat-static-syllabus
+          destination-repository-username: tuat-static-syllabus.github.io
