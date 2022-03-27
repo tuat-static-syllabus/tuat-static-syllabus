@@ -122,6 +122,7 @@ async function publish(dest, lang, layout, contents, textOverride = {}) {
   const output = `---
 ${JSON.stringify({
     title: pageLangs.__[lang][`${layout}_title`] || textOverride.__title,
+    permalink: `/${dest}`,
     layout,
     texts: Object.assign({}, pageLangs[layout][lang], textOverride),
     contents,
