@@ -48,8 +48,10 @@ jobs:
           git commit -am"automatic: push generated files @ $(date +'%Y%m%d')" || true
           GIT_EDITOR=true git merge origin/coding || git merge --abort
           git push
+      - name: Compress generated files
+        run: tar -cJf generated.tar.xz generated/
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: generated
-          path: generated/
+          name: generated.tar.xz
+          path: generated.tar.xz
