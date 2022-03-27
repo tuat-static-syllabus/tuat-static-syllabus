@@ -107,6 +107,16 @@ async function inlineMonolingual(obj, lang) {
   return obj;
 }
 
+function sanitizeGrades(gr){
+  if(!gr.min){
+    delete gr.min;
+  }
+  if(!gr.max){
+    delete gr.max;
+  }
+  return gr;
+}
+
 async function publish(dest, lang, layout, contents, textOverride = {}) {
   await createDir(path.dirname(`generated/${dest}`));
   const output = `---
@@ -122,7 +132,7 @@ ${JSON.stringify({
 
 // generate subjects pages
 const years = new Set([]);
-// const years = new Set([2017,2018,2019,2020,2021,2022]);
+// const years = new Set([2017, 2018, 2019, 2020, 2021, 2022]);
 console.log(await countRows("subjects"));
 for await (const row of enumerateRows("subjects")) {
   // break;
@@ -133,22 +143,25 @@ for await (const row of enumerateRows("subjects")) {
   // _references -> references
   row.references = row._references;
   delete row._references;
-  // surprisingly (and luckily in this time), Jekyll emits empty for 0 number literal.
-  // so there won't be sanitization for grades key. ("| textilize" is needed to show 0 instead)
+  // sanitize grades key
+  sanitizeGrades(row.grades);
 
   console.log(`Generating ${row.name[row.present_lang.lang_code]} (${row.present_lang.lang_code})`);
   await publish(
     `${row.present_lang.lang_code}/${row.year}/${printf("%02d", nDepId)}/${row.course_code}.html`,
     row.present_lang.lang_code,
     "syllabus_details",
-    row);
+    row,
+    {
+      __title: row.name[row.present_lang.lang_code],
+    });
 
   years.add(row.year);
 }
 console.log(years);
 
 function range(start, end) {
-  return Array(end - start).fill().map((e, i) => start + i);
+  return Array(end - start + 1).fill().map((e, i) => start + i);
 }
 
 async function generatePages(pageDest, lang, visibleFilters, filter, params) {
@@ -162,6 +175,18 @@ async function generatePages(pageDest, lang, visibleFilters, filter, params) {
   }
   let pageNum = 1;
   for await (const page of enumerateRows("subjects", pageSize, filter, params, false)) {
+    const subjects = [];
+    for (const row of page) {
+      await inlineVars(row, ["semester", "name", "instructor", "day_period", "grades"]);
+      subjects.push({
+        href: `/${lang}/${row.year}/${printf("%02d", row.neutral_department_id)}/${row.course_code}.html`,
+        semester: row.semester[lang],
+        title: row.name[lang],
+        instructor: row.instructor[lang],
+        day_period: row.day_period[lang],
+        year: sanitizeGrades(row.grades),
+      });
+    }
     const content = {
       pages: {
         now: pageNum,
@@ -171,7 +196,7 @@ async function generatePages(pageDest, lang, visibleFilters, filter, params) {
       },
       total: rowCount,
       filters,
-      subjects: [],
+      subjects,
     };
     // index is for selecting, not here
     // if (pageNum === 1) {
@@ -250,7 +275,7 @@ for await (const lang of enumerateRows("present_lang_table")) {
 
 await publish("index.html", "ja", "listings", {
   items: [
-    { href: "", value: "Select a language to display syllabus:" },
+    { value: "Select a language to display syllabus:" },
     ...langSelection,
   ]
 }, {
