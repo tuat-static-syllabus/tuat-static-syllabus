@@ -40,10 +40,12 @@ jobs:
       - name: Run scraper
         run: node src/scraper.mjs --no-resume --only-recent || node src/scraper.mjs --only-recent || node src/scraper.mjs --only-recent
 
-      - id: get_date
+      - name: Decide release name
+        id: get_date
         run: |
-          echo "::set-output name=tag_name::$(date +'%Y%m%d')"
-          echo "::set-output name=human_readable::$(date +'%Y/%m/%d')"
+          export NOW_RAW="$(date)"
+          echo "::set-output name=tag_name::$(date --date="${NOW_RAW}" +'%Y%m%d%H%M%S')"
+          echo "::set-output name=human_readable::$(date --date="${NOW_RAW}" +'%Y/%m/%d %H:%M:%S')"
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
