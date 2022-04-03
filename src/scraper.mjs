@@ -1,29 +1,29 @@
 // syllabus scraper
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import { LocalDate, ZoneId } from '@js-joda/core';
-import {} from "@js-joda/timezone";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+import { LocalDate, ZoneId } from "@js-joda/core";
+import { } from "@js-joda/timezone";
 import puppeteer from "puppeteer";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
 const options = await yargs(hideBin(process.argv))
-  .option('resume', {
-    type: 'boolean',
-    description: 'Resume from previously stopped point',
+  .option("resume", {
+    type: "boolean",
+    description: "Resume from previously stopped point",
     default: true,
-  })
-  .option('only-recent', {
-    type: 'boolean',
-    description: 'Scrape only recent years according to academic year',
+  }).option("only-recent", {
+    type: "boolean",
+    description: "Scrape only recent years according to academic year",
     default: false,
-  })
-  .option('headless', {
-    type: 'boolean',
-    description: 'Headless mode',
+  }).option("headless", {
+    type: "boolean",
+    description: "Headless mode",
     default: true,
-  })
-  .parse();
+  }).option("language", {
+    type: "string",
+    description: "Syllabus language to scrape",
+  }).parse();
 
 const browser = await puppeteer.launch({
   headless: options.headless,
@@ -435,6 +435,11 @@ async function processPage(lang, year, faculty, dayPeriod) {
   console.log(`Inserted ${jpnSubjectName} [${engSubjectName}] for ${lang}`);
 }
 
+let languages = ["ja", "en"];
+if (languages.indexOf(options.language) != -1) {
+  languages = [options.language];
+}
+
 try {
   // start the session; beginning of our fight with the insanely and unnecessarily stateful website
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
@@ -444,21 +449,20 @@ try {
   if (resuming) {
     console.log(`Resuming from: ${_lang}, ${_year}, ${_faculty}, ${_page}, ${_row}`)
   }
-  for (const syllabusLanguage of ["ja", "en"]) {
+  for (const syllabusLanguage of languages) {
     if (resuming && syllabusLanguage !== _lang)
       continue;
 
-    for (const year of [...initialDDs.ddl_year].reverse()) {
+    let years = [...initialDDs.ddl_year].reverse();
+    if (options.onlyRecent) {
+      // --only-recent
+      const now = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+      const annualYear = now.minusMonths(3).year();
+      years = years.filter(year => annualYear > +year.value);
+    }
+    for (const year of years) {
       if (resuming && year.value !== _year)
         continue;
-      if (options.onlyRecent) {
-        // --only-recent
-        const now = LocalDate.now(ZoneId.of("Asia/Tokyo"));
-        const annualYear = now.minusMonths(3).year();
-        if (annualYear > +year.value) {
-          continue;
-        }
-      }
 
       if (syllabusLanguage === "en") {
         await switchEN();
@@ -624,8 +628,8 @@ try {
       }
     }
   }
-// } catch (e) {
-//   console.log(e);
+  // } catch (e) {
+  //   console.log(e);
 } finally {
   await db.close();
   await browser.close();
