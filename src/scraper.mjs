@@ -1,11 +1,32 @@
 // syllabus scraper
-
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+import { LocalDate, ZoneId } from '@js-joda/core';
+import {} from "@js-joda/timezone";
 import puppeteer from "puppeteer";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
+const options = await yargs(hideBin(process.argv))
+  .option('resume', {
+    type: 'boolean',
+    description: 'Resume from previously stopped point',
+    default: true,
+  })
+  .option('only-recent', {
+    type: 'boolean',
+    description: 'Scrape only recent years according to academic year',
+    default: false,
+  })
+  .option('headless', {
+    type: 'boolean',
+    description: 'Headless mode',
+    default: true,
+  })
+  .parse();
+
 const browser = await puppeteer.launch({
-  // headless: false,
+  headless: options.headless,
   args: ["-disable-prompt-on-repost"],
 });
 const page = await browser.newPage();
@@ -264,6 +285,9 @@ async function writeResumeInfo(lang, year, faculty, pageNum, row) {
 }
 
 async function readResumeInfo() {
+  if (!options.resume) {
+    return [false, null, null, null, null, null];
+  }
   const resp = await db.get("SELECT lang, year, faculty, page, row FROM resume_info ORDER BY id DESC LIMIT 1;");
   if (!resp) {
     return [false, null, null, null, null, null];
@@ -317,12 +341,12 @@ async function typeInput(tagId, value, wait = false) {
   ]);
 }
 
-function searchDetailsButtons(){
+function searchDetailsButtons() {
   return page.$$("input[type=submit][value=詳細],input[type=submit][value=Details]");
 }
 
-async function switchEN(){
-  if(await innerByQuery("span#lblYear")=="Choose academic year"){
+async function switchEN() {
+  if (await innerByQuery("span#lblYear") == "Choose academic year") {
     // already English
     return;
   }
@@ -427,6 +451,14 @@ try {
     for (const year of [...initialDDs.ddl_year].reverse()) {
       if (resuming && year.value !== _year)
         continue;
+      if (options.onlyRecent) {
+        // --only-recent
+        const now = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+        const annualYear = now.minusMonths(4).year();
+        if (annualYear > +year.value) {
+          continue;
+        }
+      }
 
       if (syllabusLanguage === "en") {
         await switchEN();
