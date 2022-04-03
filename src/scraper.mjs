@@ -624,8 +624,8 @@ try {
       }
     }
   }
-} catch (e) {
-  console.log(e);
+// } catch (e) {
+//   console.log(e);
 } finally {
   await db.close();
   await browser.close();
