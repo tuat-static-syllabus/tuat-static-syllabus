@@ -454,7 +454,7 @@ try {
       if (options.onlyRecent) {
         // --only-recent
         const now = LocalDate.now(ZoneId.of("Asia/Tokyo"));
-        const annualYear = now.minusMonths(4).year();
+        const annualYear = now.minusMonths(3).year();
         if (annualYear > +year.value) {
           continue;
         }
