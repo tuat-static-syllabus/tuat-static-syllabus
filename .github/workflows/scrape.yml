@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  japanese:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -38,7 +38,32 @@ jobs:
       - name: Delete resume info
         run: node src/reset_resume.mjs
       - name: Run scraper
-        run: node src/scraper.mjs --no-resume --only-recent || node src/scraper.mjs --only-recent || node src/scraper.mjs --only-recent
+        run: ./misc/ci_hotoke.sh --only-recent --language=ja
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: syllabus.sqlite
+          path: first-half
+
+  english:
+    needs: japanese
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Nodejs
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install deps
+        run: npm i
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: first-half
+
+      - name: Run scraper
+        run: ./misc/ci_hotoke.sh --only-recent --language=en
 
       - name: Decide release name
         id: get_date
@@ -71,4 +96,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: syllabus.sqlite
-          path: syllabus.sqlite
+          path: second-half
