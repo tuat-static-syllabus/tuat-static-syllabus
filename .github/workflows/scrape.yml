@@ -38,7 +38,7 @@ jobs:
       - name: Delete resume info
         run: node src/reset_resume.mjs
       - name: Run scraper
-        run: node src/scraper.mjs --no-resume --only-recent
+        run: node src/scraper.mjs --no-resume --only-recent || node src/scraper.mjs --only-recent || node src/scraper.mjs --only-recent
 
       - id: get_date
         run: |
