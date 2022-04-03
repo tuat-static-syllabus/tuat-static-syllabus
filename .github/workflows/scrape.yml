@@ -1,0 +1,70 @@
+name: Scrape syllabus
+
+on:
+  schedule:
+    - cron:  '0 0 * * 2'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Nodejs
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - name: Install deps
+        run: npm i
+      - name: Fetch latest database
+        id: search-db
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            const release = await github.request('GET /repos/{owner}/{repo}/releases/latest', {
+              owner: 'tuat-static-syllabus',
+              repo: 'tuat-static-syllabus'
+            });
+            for (const {name, browser_download_url} of release.data.assets) {
+              if (name != "syllabus.sqlite"){
+                continue;
+              }
+              return browser_download_url;
+            }
+            throw new Error("File not found!");
+      - name: Download latest database
+        run: wget "${{ steps.search-db.outputs.result }}" -O syllabus.sqlite
+      - name: Delete resume info
+        run: node src/reset_resume.mjs
+      - name: Run scraper
+        run: node src/scraper.mjs --no-resume --only-recent
+
+      - id: get_date
+        run: |
+          echo "::set-output name=tag_name::$(date +'%Y%m%d')"
+          echo "::set-output name=human_readable::$(date +'%Y/%m/%d')"
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.get_date.outputs.tag_name }}
+          release_name: ${{ steps.get_date.outputs.human_readable }}
+          draft: false
+          prerelease: false
+          body: Automatically scraped at ${{ steps.get_date.outputs.human_readable }}
+
+      - name: Upload Releases
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: syllabus.sqlite
+          asset_name: syllabus.sqlite
+          asset_content_type: application/octet-stream
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: syllabus.sqlite
+          path: syllabus.sqlite
