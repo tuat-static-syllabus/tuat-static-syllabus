@@ -458,7 +458,7 @@ try {
       // --only-recent
       const now = LocalDate.now(ZoneId.of("Asia/Tokyo"));
       const annualYear = now.minusMonths(3).year();
-      years = years.filter(year => annualYear > +year.value);
+      years = years.filter(year => annualYear <= +year.value);
     }
     for (const year of years) {
       if (resuming && year.value !== _year)
