@@ -43,8 +43,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: syllabus.sqlite
-          path: first-half
+          name: first-half
+          path: syllabus.sqlite
 
   english:
     needs: japanese
@@ -95,5 +95,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: syllabus.sqlite
-          path: second-half
+          name: second-half
+          path: syllabus.sqlite
