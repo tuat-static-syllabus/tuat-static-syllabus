@@ -479,9 +479,9 @@ try {
             const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
             if (displayingPage === null) {
               console.log("This page is empty. (No search results?)");
-              return;
+              return false;
             } else if (displayingPage === `${currentPage}`) {
-              return;
+              return true;
             }
           }
           // try to go to the next page
@@ -531,8 +531,10 @@ try {
             const displayingPage = await innerByQuery("tr[align=center]:not([style]) span");
             if (displayingPage !== `${currentPage}`) {
               console.log(`WARN: Opening wrong page. ${displayingPage} vs ${currentPage}`);
+              return false;
             }
           }
+          return true;
         }
 
         // eslint-disable-next-line no-inner-declarations
@@ -559,7 +561,7 @@ try {
         }
 
         do {
-          await reopenPage();
+          if (!await reopenPage()) break;
           console.log(`Now at page ${currentPage} (out of ~${knownMax})`);
           // iterate through 詳細 buttons, in weird way!
           let itemsInPage = await searchDetailsButtons();
