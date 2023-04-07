@@ -22,6 +22,11 @@ const options = await yargs(hideBin(process.argv))
   }).option("language", {
     type: "string",
     description: "Syllabus language to scrape",
+  }).option("reduce-pages", {
+    type: "string",
+    description: "Select mode to reduce pages",
+    choices: ['all', 'even', 'odd'],
+    default: "all",
   }).parse();
 
 const browser = await puppeteer.launch({
@@ -320,8 +325,9 @@ async function switchEN() {
   await click("SelectLanguage1_imgJE", true);
 }
 
-function init() {
-  console.log("Wiping all states");
+function init(message = true) {
+  if (message)
+    console.log("Wiping all states");
   return page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
 }
 
@@ -332,7 +338,7 @@ function sleep(ms) {
 async function processPage(lang, year, faculty, dayPeriod) {
   // for subject name and instructor, both JPN and ENG exist in the page
   // except them requires to be extracted individually
-  // mispelling of the following variables are made intentional
+  // mispelling of the following variables are intentional
   const jpnSubjectName = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_sbj_name"), "en");
   const engSubjectName = sanitizeDepsAndYear(await innerByQuery("span#Detail_lbl_sbj_name_e"), "en");
   const courseCateg = await innerByQuery("span#Detail_lbl_sbj_area_name");
@@ -409,6 +415,7 @@ if (languages.indexOf(options.language) != -1) {
 try {
   // start the session; beginning of our fight with the insanely and unnecessarily stateful website
   await page.goto("https://spica.gakumu.tuat.ac.jp/Syllabus/SearchMain.aspx");
+  await init(false);
   // response.request.res.responseUrl
   const initialDDs = await findDropdowns();
   let [resuming, _lang, _year, _faculty, _page, _row] = await readResumeInfo();
@@ -450,10 +457,19 @@ try {
 
         // now subject list page was shown, let's do scrape each subjects and paging
         let currentPage = 1,
-          knownMax = 1;
+          knownMax = 1,
+          pageIncrement = 1;
 
         if (resuming) {
           currentPage = knownMax = +_page;
+        }
+        if (options.reducePages !== "all") {
+          pageIncrement = 2;
+          if (resuming && (!(currentPage % 2) ^ options.reducePages === "even")) {
+            currentPage += 1;
+          } else if (options.reducePages === "even") {
+            currentPage = 2;
+          }
         }
 
         // eslint-disable-next-line no-inner-declarations
@@ -587,7 +603,7 @@ try {
           }
 
           await estimatePageNumber();
-          currentPage++;
+          currentPage += pageIncrement;
         } while (currentPage <= knownMax);
 
         await init();
