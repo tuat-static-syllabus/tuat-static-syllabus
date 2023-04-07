@@ -33,6 +33,7 @@ jobs:
     needs: [scrape]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Set up Nodejs
         uses: actions/setup-node@v2
         with:

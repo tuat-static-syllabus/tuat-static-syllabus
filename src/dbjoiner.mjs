@@ -63,22 +63,21 @@ try {
         requirement, credits, department_id, grades_id,//
         semester_id, course_type_id, course_code,//
         instructor_id, facility_affiliation_id, office_id, email,//
-  
+
         course_description, expected_learning, course_schedule, prerequisites,//
         texts_and_materials, _references, assessment, message_from_instructor,//
         course_keywords, office_hours, remarks_1, remarks_2, related_url,//
         course_language, taught_language, last_update,//
-  
+
         day_period_id,//
       );
     }
   }
 
   console.log("Removing resume info from the output DB");
-  await destDb.run("DELETE FROM resume_info; VACUUM;");
+  await destDb.run("DELETE FROM resume_info; VACUUM;").catch(a => a);
 } finally {
   await Promise.allSettled(
-    destDb.close(),
-    ...sourceDb.map(a => a.close()),
+    sourceDb.map(a => a.close()).concat(destDb.close()),
   );
 }
