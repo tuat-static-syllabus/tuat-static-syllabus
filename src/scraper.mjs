@@ -539,21 +539,27 @@ try {
         async function estimatePageNumber() {
           // get maximum number of pages
           let hasMore = false;
+          let extended = currentPage % 2 == 0 && pageIncrement !== 1, dotLink;
           for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
             const linkText = (await inner(pageElem)).trim();
             if (linkText === "...") {
+              dotLink = pageElem;
               hasMore = true;
               continue;
             }
             const num = parseInt(linkText) + !!hasMore;
             // failed to parse (次へ or ...)
-            if (num !== num) continue;
+            if (isNaN(num)) continue;
             // we're already on last page
             if (num <= knownMax) break;
-            if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
-
-            knownMax = num;
-            break;
+            if (extended && hasMore) {
+              console.log(`Expanding dots to find more pages: ${num}`);
+              await pageElem.click();
+            } else {
+              if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+              knownMax = num;
+              break;
+            }
           }
         }
 
