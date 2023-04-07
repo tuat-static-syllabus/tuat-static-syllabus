@@ -4,8 +4,7 @@ import { hideBin } from "yargs/helpers";
 import { LocalDate, ZoneId } from "@js-joda/core";
 import { } from "@js-joda/timezone";
 import puppeteer from "puppeteer";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import { openDB } from "./utils.mjs";
 
 const options = await yargs(hideBin(process.argv))
   .option("resume", {
@@ -52,40 +51,7 @@ async function innerByQuery(q) {
 }
 
 // open the database
-const db = await open({
-  filename: "./syllabus.sqlite",
-  driver: sqlite3.Database,
-});
-{
-  const old = db.get;
-  db.get = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.run;
-  db.run = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.exec;
-  db.exec = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
+const db = await openDB("./syllabus.sqlite");
 
 // prepare tables
 {

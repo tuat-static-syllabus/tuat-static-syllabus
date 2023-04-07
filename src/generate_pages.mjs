@@ -1,7 +1,7 @@
 // generate pages to be processed by Jekyll from database
 
 import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import { openDB } from "./utils.mjs";
 import fs from "fs";
 import path from "path";
 import util from "util";
@@ -10,42 +10,7 @@ import printf from "printf";
 import pageLangs from "./page_langs.json";
 
 // open the database
-const db = await open({
-  filename: "./syllabus.sqlite",
-  driver: sqlite3.Database,
-  // open DB in R/O to ensure safety
-  mode: sqlite3.OPEN_READONLY,
-});
-{
-  const old = db.get;
-  db.get = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.run;
-  db.run = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.exec;
-  db.exec = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
+const db = await openDB("./syllabus.sqlite", sqlite3.OPEN_READONLY);
 
 
 function betterEach() {
