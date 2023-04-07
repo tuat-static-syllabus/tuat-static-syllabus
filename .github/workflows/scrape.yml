@@ -33,6 +33,10 @@ jobs:
     needs: [scrape]
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Nodejs
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
       - name: Download artifacts 1
         uses: actions/download-artifact@v2
         with:
