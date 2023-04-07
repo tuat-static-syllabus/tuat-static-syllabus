@@ -317,7 +317,7 @@ function searchDetailsButtons() {
 }
 
 async function switchEN() {
-  if (await innerByQuery("span#lblYear") == "Choose academic year") {
+  if (await innerByQuery("span#lblYear") === "Choose academic year") {
     // already English
     return;
   }
@@ -408,7 +408,7 @@ async function processPage(lang, year, faculty, dayPeriod) {
 }
 
 let languages = ["ja", "en"];
-if (languages.indexOf(options.language) != -1) {
+if (languages.indexOf(options.language) !== -1) {
   languages = [options.language];
 }
 
@@ -539,28 +539,22 @@ try {
         async function estimatePageNumber() {
           // get maximum number of pages
           let hasMore = false;
-          let extended = currentPage % 2 == 0 && pageIncrement !== 1, dotLink;
+          const extended = currentPage % 2 === 0 && pageIncrement !== 1;
           for (const pageElem of (await page.$$("tr[align=center]:not([style]) a")).reverse()) {
             const linkText = (await inner(pageElem)).trim();
             if (linkText === "...") {
-              dotLink = pageElem;
               hasMore = true;
               continue;
             }
-            const num = parseInt(linkText) + !!hasMore;
+            // add one more for extended mode to find new potential page
+            const num = parseInt(linkText) + !!hasMore * (1 + !!extended);
             // failed to parse (次へ or ...)
             if (isNaN(num)) continue;
             // we're already on last page
-            if (extended && hasMore) {
-              console.log(`Expanding dots to find more pages: ${num}`);
-              await dotLink.click();
-              extended = false;
-            } else {
-              if (num <= knownMax) break;
-              if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
-              knownMax = num;
-              break;
-            }
+            if (num <= knownMax) break;
+            if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
+            knownMax = num;
+            break;
           }
         }
 
