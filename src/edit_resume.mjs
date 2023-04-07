@@ -18,44 +18,10 @@ if (pageNum === undefined) {
 // parse page number and row into integer
 pageNum = +pageNum; row = +row;
 
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import { openDB } from "./utils.mjs";
 
 // open the database
-const db = await open({
-  filename: "./syllabus.sqlite",
-  driver: sqlite3.Database,
-});
-{
-  const old = db.get;
-  db.get = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.run;
-  db.run = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
-{
-  const old = db.exec;
-  db.exec = async function () {
-    try {
-      return await old.apply(db, arguments);
-    } catch (e) {
-      throw new Error(e);
-    }
-  }
-}
+const db = await openDB("./syllabus.sqlite");
 try {
   await db.run("INSERT INTO resume_info(lang, year, faculty, page, row) VALUES (?,?,?,?,?)", lang, year, faculty, pageNum, row);
 } finally {

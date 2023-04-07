@@ -4,7 +4,7 @@ import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
 
-async function openDB(filename, mode) {
+export async function openDB(filename, mode) {
   // open the database
   const db = await open({
     filename, mode,
