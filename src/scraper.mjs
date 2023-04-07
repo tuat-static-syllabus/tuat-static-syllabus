@@ -553,7 +553,7 @@ try {
             // failed to parse (次へ or ...)
             if (isNaN(num)) continue;
             // we're already on last page
-            if (!extended && num <= knownMax) break;
+            if (!(extended && hasMore) && num <= knownMax) break;
             if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
             knownMax = num;
             break;
