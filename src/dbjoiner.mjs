@@ -11,10 +11,10 @@ const output = argv[argv.length - 1];
 const sourceDb = await Promise.all(sources.map(openDB));
 const destDb = await openDB(output);
 
-function betterEach(db) {
+function betterEach(db, ...ex) {
   return new Promise((resolve, reject) => {
     const rows = [];
-    db.each(...Array.from(arguments).slice(1), (err, row) => {
+    db.each(...ex, (err, row) => {
       if (err) {
         return reject(err);
       }
