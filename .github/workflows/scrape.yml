@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  japanese:
+  scrape:
+    strategy:
+      matrix:
+        lang: [ja, en]
+        pages: [odd, even]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -16,7 +20,40 @@ jobs:
           node-version: '14'
       - name: Install deps
         run: npm i
-      - name: Fetch latest database
+      - name: Run scraper
+        run: ./misc/ci_hotoke.sh --only-recent --language="${{ matrix.lang }}" --reduce-pages="${{ matrix.pages }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: "${{ matrix.lang }}"-"${{ matrix.pages }}"
+          path: syllabus.sqlite
+
+  join:
+    needs: [scrape]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts 1
+        uses: actions/download-artifact@v2
+        with:
+          name: ja-odd
+          path: db1/
+      - name: Download artifacts 2
+        uses: actions/download-artifact@v2
+        with:
+          name: ja-even
+          path: db2/
+      - name: Download artifacts 3
+        uses: actions/download-artifact@v2
+        with:
+          name: en-odd
+          path: db3/
+      - name: Download artifacts 4
+        uses: actions/download-artifact@v2
+        with:
+          name: en-even
+          path: db4/
+      - name: Find latest database
         id: search-db
         uses: actions/github-script@v6
         with:
@@ -35,35 +72,8 @@ jobs:
             throw new Error("File not found!");
       - name: Download latest database
         run: wget "${{ steps.search-db.outputs.result }}" -O syllabus.sqlite
-      - name: Delete resume info
-        run: node src/reset_resume.mjs
-      - name: Run scraper
-        run: ./misc/ci_hotoke.sh --only-recent --language=ja
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: first-half
-          path: syllabus.sqlite
-
-  english:
-    needs: japanese
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Nodejs
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-      - name: Install deps
-        run: npm i
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: first-half
-
-      - name: Run scraper
-        run: ./misc/ci_hotoke.sh --only-recent --language=en
+      - name: Join artifacts
+        run: node src/dbjoiner.mjs db?/syllabus.sqlite syllabus.sqlite
 
       - name: Decide release name
         id: get_date
@@ -95,5 +105,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: second-half
+          name: full
           path: syllabus.sqlite
