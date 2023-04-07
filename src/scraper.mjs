@@ -551,11 +551,12 @@ try {
             // failed to parse (次へ or ...)
             if (isNaN(num)) continue;
             // we're already on last page
-            if (num <= knownMax) break;
             if (extended && hasMore) {
               console.log(`Expanding dots to find more pages: ${num}`);
-              await pageElem.click();
+              await dotLink.click();
+              extended = false;
             } else {
+              if (num <= knownMax) break;
               if (num !== knownMax) console.log(`Updating known maximum: ${knownMax} => ${num}`);
               knownMax = num;
               break;
