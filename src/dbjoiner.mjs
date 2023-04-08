@@ -8,7 +8,10 @@ const sources = argv.slice(0, argv.length - 1);
 const output = argv[argv.length - 1];
 
 // open the database
-const sourceDb = await Promise.all(sources.map(openDB));
+const sourceDb = new Array(sources.length);
+for (const idx in sources) {
+  sourceDb[idx] = await openDB(sources[idx]);
+}
 const destDb = await openDB(output);
 
 function betterEach(db, ...ex) {
