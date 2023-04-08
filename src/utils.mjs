@@ -9,7 +9,7 @@ export async function openDB(filename, mode) {
   const db = await open({
     filename, mode,
     driver: sqlite3.Database,
-  });
+  }).catch(e => Promise.reject(new Error(e)));
   {
     const old = db.get;
     db.get = async function () {
